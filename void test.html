@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>时呓的虚空测试</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Cinzel+Decorative:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg-deep:      #0a0806;
+      --bg-mid:       #110e0a;
+      --bg-card:      #1a1510;
+      --border:       #3a2e20;
+      --border-glow:  #6b4c2a;
+      --text-primary: #e8dcc8;
+      --text-muted:   #8a7a62;
+      --accent:       #c17f3a;
+      --accent-dark:  #7a4e1e;
+      --accent-glow:  rgba(193,127,58,.35);
+      --red-ink:      #8b2020;
+      --green-dim:    #2a4a2a;
+      --selected-bg:  #2c1f10;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: var(--bg-deep);
+      color: var(--text-primary);
+      font-family: 'Noto Serif SC', 'IM Fell English', serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='3' fill='%23c17f3a' opacity='.8'/%3E%3Ccircle cx='10' cy='10' r='8' fill='none' stroke='%23c17f3a' stroke-width='1' opacity='.4'/%3E%3C/svg%3E") 10 10, crosshair;
+    }
+
+    .bg-texture {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(80,40,10,.6) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 80% at 20% 100%, rgba(40,20,5,.8) 0%, transparent 60%);
+      opacity: .9;
+    }
+    .bg-texture::after {
+      content: '';
+      position: absolute; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+      opacity: .5;
+    }
+    .scanlines {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,0,0,.08) 2px, rgba(0,0,0,.08) 4px
+      );
+    }
+
+    .main-wrap {
+      position: relative; z-index: 10;
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    .ornament {
+      display: flex; align-items: center; gap: .75rem;
+      width: 100%; max-width: 420px; margin: 1.2rem 0;
+      color: var(--text-muted);
+    }
+    .ornament::before, .ornament::after {
+      content: ''; flex: 1; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+    }
+    .ornament span { font-size: .7rem; letter-spacing: .15em; white-space: nowrap; }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      box-shadow:
+        0 0 0 1px rgba(193,127,58,.08),
+        inset 0 0 40px rgba(0,0,0,.6),
+        0 8px 40px rgba(0,0,0,.8);
+      padding: 2.5rem 2rem;
+      width: 100%; max-width: 480px;
+    }
+
+    .title-main {
+      font-family: 'Cinzel Decorative', 'Noto Serif SC', serif;
+      font-size: clamp(1.6rem, 6vw, 2.4rem);
+      font-weight: 700;
+      line-height: 1.15;
+      color: var(--text-primary);
+      text-shadow: 0 0 30px var(--accent-glow), 0 2px 4px rgba(0,0,0,.9);
+      letter-spacing: .05em;
+    }
+    .title-main .accent-char {
+      color: var(--red-ink);
+      text-shadow: 0 0 20px rgba(139,32,32,.6);
+    }
+
+    /* ── 封面副标题 ── */
+    .cover-tagline {
+      font-size: .9rem;
+      line-height: 2.4;
+      color: var(--text-muted);
+      margin: 1rem 0 2rem;
+      font-style: italic;
+    }
+    .highlight-line {
+      color: var(--text-primary);
+      display: inline-block;
+    }
+
+    /* "呓/玖/柒"切换动画 */
+    .yi-char {
+      display: inline-block;
+      color: var(--accent);
+      transition: opacity 0.08s;
+    }
+    .yi-char.switching {
+      animation: yiFlip 0.28s ease forwards;
+    }
+    @keyframes yiFlip {
+      0%   { opacity: 1;  transform: scaleY(1)   translateY(0); }
+      35%  { opacity: 0;  transform: scaleY(0.1) translateY(-3px); }
+      65%  { opacity: 0;  transform: scaleY(0.1) translateY(3px); }
+      100% { opacity: 1;  transform: scaleY(1)   translateY(0); }
+    }
+
+    /* "谁"字乱码 */
+    .shui-char {
+      display: inline-block;
+      color: var(--text-primary);
+    }
+
+    /* ── 问题部分 ── */
+    .question-counter {
+      font-size: .68rem; letter-spacing: .2em;
+      color: var(--accent); text-transform: uppercase;
+    }
+    .question-text {
+      font-size: 1.05rem; line-height: 1.8;
+      color: var(--text-primary);
+      margin: .75rem 0 1.5rem;
+    }
+
+    .options-wrap { display: flex; flex-direction: column; gap: .6rem; }
+    .option-btn {
+      display: flex; align-items: center; gap: .9rem;
+      background: transparent;
+      border: 1px solid var(--border);
+      padding: .75rem 1rem;
+      cursor: pointer;
+      color: var(--text-primary);
+      font-family: inherit; font-size: .88rem;
+      text-align: left; width: 100%;
+      transition: all .2s ease;
+      position: relative; overflow: hidden;
+    }
+    .option-btn::before {
+      content: ''; position: absolute; left: 0; top: 0;
+      width: 0; height: 100%;
+      background: linear-gradient(90deg, var(--accent-glow), transparent);
+      transition: width .3s ease;
+    }
+    .option-btn:hover::before { width: 100%; }
+    .option-btn:hover { border-color: var(--border-glow); color: #f0e8d8; }
+    .option-btn.selected {
+      border-color: var(--accent);
+      background: var(--selected-bg);
+      color: var(--accent);
+    }
+    .option-btn.selected .opt-dot { background: var(--accent); }
+
+    .opt-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      border: 1px solid var(--text-muted);
+      flex-shrink: 0; transition: background .2s;
+    }
+    .opt-label {
+      font-size: .65rem; color: var(--text-muted);
+      letter-spacing: .1em; flex-shrink: 0; width: 1.4rem;
+    }
+
+    .scale-labels {
+      display: flex; justify-content: space-between;
+      font-size: .6rem; color: var(--text-muted);
+      letter-spacing: .1em; margin-top: .5rem;
+      padding: 0 .25rem;
+    }
+
+    .progress-wrap {
+      width: 100%; height: 2px;
+      background: var(--border);
+      margin: 1.5rem 0 .5rem;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-dark), var(--accent));
+      transition: width .4s ease;
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: linear-gradient(135deg, #1c1208, #2a1a08);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: 'Noto Serif SC', serif;
+      font-size: .9rem; letter-spacing: .2em;
+      padding: .95rem 2rem;
+      cursor: pointer;
+      position: relative; overflow: hidden;
+      transition: all .3s ease;
+      box-shadow: inset 0 0 20px rgba(193,127,58,.1), 0 4px 20px rgba(0,0,0,.6);
+    }
+    .btn-primary::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, transparent 0%, rgba(193,127,58,.15) 100%);
+      opacity: 0; transition: opacity .3s;
+    }
+    .btn-primary:hover::after { opacity: 1; }
+    .btn-primary:hover { box-shadow: 0 0 20px var(--accent-glow), inset 0 0 20px rgba(193,127,58,.15); }
+    .btn-primary:disabled { opacity: .35; cursor: not-allowed; }
+
+    .btn-ghost {
+      background: transparent; border: none;
+      color: var(--red-ink); font-family: inherit;
+      font-size: .82rem; letter-spacing: .15em;
+      cursor: pointer; padding: .4rem 1rem;
+      transition: color .2s;
+    }
+    .btn-ghost:hover { color: #c14040; }
+
+    /* ════════════════════════════════════
+       结果页
+    ════════════════════════════════════ */
+
+    /* 顶部小字 */
+    .result-eyebrow {
+      font-family: 'IM Fell English', serif;
+      font-style: italic;
+      font-size: .6rem;
+      letter-spacing: .38em;
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 2rem;
+      opacity: .7;
+    }
+
+    /* 结果标识区 */
+    .result-identity-wrap {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 0 1.2rem;
+      min-height: 160px;
+    }
+
+    /* 水波圆环（向外扩散） */
+    .ripple-ring {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      border: 1px solid var(--accent);
+      pointer-events: none;
+      opacity: 0;
+    }
+    .ripple-ring:nth-child(1) { animation: rippleExpand 3.6s ease-out infinite 0s; }
+    .ripple-ring:nth-child(2) { animation: rippleExpand 3.6s ease-out infinite 1.2s; }
+    .ripple-ring:nth-child(3) { animation: rippleExpand 3.6s ease-out infinite 2.4s; }
+
+    @keyframes rippleExpand {
+      0%   { width: 40px;  height: 40px;  opacity: .55; }
+      60%  { opacity: .2; }
+      100% { width: 220px; height: 220px; opacity: 0; }
+    }
+
+    /* 结果名称大字 */
+    .result-name-large {
+      font-family: 'Cinzel Decorative', 'Noto Serif SC', serif;
+      font-size: clamp(1.8rem, 8vw, 3rem);
+      font-weight: 700;
+      color: var(--accent);
+      text-shadow:
+        0 0 40px rgba(193,127,58,.7),
+        0 0 80px rgba(193,127,58,.25);
+      letter-spacing: .06em;
+      line-height: 1.1;
+      position: relative;
+      z-index: 2;
+      text-align: center;
+    }
+
+    /* 副标题行 */
+    .result-sub-line {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      margin-top: .7rem;
+      position: relative;
+      z-index: 2;
+    }
+    .result-sub-line::before,
+    .result-sub-line::after {
+      content: '';
+      width: 36px; height: 1px;
+      background: var(--border-glow);
+      opacity: .6;
+    }
+    .result-sub-text {
+      font-family: 'IM Fell English', serif;
+      font-style: italic;
+      font-size: .68rem;
+      letter-spacing: .2em;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    /* 描述框 */
+    .result-desc-box {
+      background: rgba(26,21,16,.6);
+      border: 1px solid var(--border);
+      border-left: 2px solid var(--border-glow);
+      padding: 1.1rem 1.3rem 1.1rem 1.6rem;
+      margin: 1.4rem 0 1rem;
+      font-size: .87rem;
+      line-height: 2;
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: left;
+      position: relative;
+    }
+    .result-desc-box::before {
+      content: '"';
+      position: absolute;
+      top: .1rem; left: .5rem;
+      font-size: 2.2rem;
+      color: var(--border-glow);
+      opacity: .35;
+      font-family: 'IM Fell English', serif;
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    /* 分隔线 */
+    .result-divider {
+      display: flex; align-items: center; gap: .75rem;
+      margin: 1rem 0 .5rem;
+      color: var(--text-muted);
+    }
+    .result-divider::before, .result-divider::after {
+      content: ''; flex: 1; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+    }
+    .result-divider span { font-size: .58rem; letter-spacing: .2em; white-space: nowrap; }
+
+    /* 雷达图 */
+    .radar-wrap {
+      position: relative;
+      width: 100%; max-width: 300px;
+      margin: .5rem auto 0;
+      aspect-ratio: 1;
+    }
+    #radarCanvas { width: 100%; height: 100%; }
+
+    /* 操作行 */
+    .action-row {
+      display: flex; gap: .75rem; margin-top: 1.8rem;
+    }
+    .action-row .btn-primary { font-size: .78rem; padding: .75rem; }
+
+    .btn-save {
+      background: linear-gradient(135deg, #0a0c14, #121828);
+      border-color: #3a5a8a;
+      color: #7aaad8;
+    }
+
+    /* ── 页面切换 ── */
+    .page { display: none; animation: fadeInPage .5s ease; }
+    .page.active { display: block; }
+    @keyframes fadeInPage {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── 角落装饰 ── */
+    .corner-tl, .corner-tr, .corner-bl, .corner-br {
+      position: absolute; width: 16px; height: 16px;
+      border-color: var(--border-glow); border-style: solid;
+      opacity: .6;
+    }
+    .corner-tl { top: 8px; left: 8px; border-width: 1px 0 0 1px; }
+    .corner-tr { top: 8px; right: 8px; border-width: 1px 1px 0 0; }
+    .corner-bl { bottom: 8px; left: 8px; border-width: 0 0 1px 1px; }
+    .corner-br { bottom: 8px; right: 8px; border-width: 0 1px 1px 0; }
+
+    .flicker { animation: flicker 6s infinite; }
+    @keyframes flicker {
+      0%,100% { opacity: 1; }
+      92% { opacity: 1; } 93% { opacity: .6; } 94% { opacity: 1; }
+      96% { opacity: .8; } 97% { opacity: 1; }
+    }
+
+    .glow-pulse { animation: glowPulse 4s ease-in-out infinite; }
+    @keyframes glowPulse {
+      0%,100% { box-shadow: 0 0 20px rgba(193,127,58,.15); }
+      50%      { box-shadow: 0 0 40px rgba(193,127,58,.35); }
+    }
+
+    @media (max-width: 380px) {
+      .card { padding: 1.8rem 1.2rem; }
+      .title-main { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg-texture"></div>
+  <div class="scanlines"></div>
+
+  <div class="main-wrap">
+
+    <!-- ═══════════════════════════════════════════
+         页面 0：封面
+         ═══════════════════════════════════════════ -->
+    <div id="page-cover" class="page active" style="width:100%;max-width:480px;">
+      <div class="card glow-pulse" style="position:relative;text-align:center;">
+        <div class="corner-tl"></div><div class="corner-tr"></div>
+        <div class="corner-bl"></div><div class="corner-br"></div>
+
+        <h1 class="title-main flicker">
+          <span>时</span><span class="accent-char">呓</span>的虚空测试
+          <br/>
+          <span style="font-size:.55em;font-family:'IM Fell English',serif;font-style:italic;color:var(--text-muted);letter-spacing:.15em;">Chronicle of the Void</span>
+        </h1>
+
+        <div class="ornament" style="margin:1.2rem auto;">
+          <span>◆ THE CALLING ◆</span>
+        </div>
+
+        <p class="cover-tagline">
+          在时<span class="yi-char" id="yi-char">呓</span>世界观里<br/>
+          <span class="highlight-line">你将成为<span class="shui-char" id="shui-char">谁</span></span>
+        </p>
+
+        <div style="font-size:.62rem;letter-spacing:.18em;color:var(--border-glow);margin-bottom:2rem;opacity:.7;line-height:2.2;">
+          IÄIÄ · AZATHOTH · PH'NGLUI MGLW'NAFH
+        </div>
+
+        <button class="btn-primary" onclick="startQuiz()">开始回答</button>
+
+        <div style="margin-top:2rem;font-size:.58rem;color:var(--border);letter-spacing:.12em;line-height:2;">
+          Questionnaire Design By <span style="color:var(--accent-dark);">@时呓</span><br/>
+          Program and Art By <span style="color:var(--accent-dark);">@时玖</span><br/>
+          Powered by <span style="color:var(--red-ink);">@时柒</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         页面 1：答题
+         ═══════════════════════════════════════════ -->
+    <div id="page-quiz" class="page" style="width:100%;max-width:480px;">
+      <div class="card" style="position:relative;">
+        <div class="corner-tl"></div><div class="corner-tr"></div>
+        <div class="corner-bl"></div><div class="corner-br"></div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+          <span class="question-counter" id="q-counter">QUERY · 01 / 09</span>
+          <span style="font-size:.6rem;color:var(--border-glow);letter-spacing:.1em;" id="q-phase">第一阶段</span>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+        </div>
+
+        <p class="question-text" id="q-text">占位题目文本</p>
+
+        <div class="scale-labels">
+          <span id="scale-left">← 完全不符</span>
+          <span id="scale-right">完全符合 →</span>
+        </div>
+
+        <div class="options-wrap" id="options-wrap" style="margin-top:.75rem;"></div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.8rem;">
+          <button class="btn-ghost" onclick="prevQuestion()" id="btn-prev">← 上一题</button>
+          <button class="btn-primary" onclick="nextQuestion()" id="btn-next"
+            style="width:auto;padding:.7rem 2rem;font-size:.82rem;" disabled>
+            继续 →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         页面 2：结果
+         ═══════════════════════════════════════════ -->
+    <div id="page-result" class="page" style="width:100%;max-width:480px;">
+      <div class="card" style="position:relative; text-align:center;">
+        <div class="corner-tl"></div><div class="corner-tr"></div>
+        <div class="corner-bl"></div><div class="corner-br"></div>
+
+        <!-- 顶部小字 -->
+        <p class="result-eyebrow">Y O U R &ensp; E X I S T E N C E &ensp; I S</p>
+
+        <!-- 结果标识 + 水波 -->
+        <div class="result-identity-wrap">
+          <div class="ripple-ring" id="ripple1"></div>
+          <div class="ripple-ring" id="ripple2"></div>
+          <div class="ripple-ring" id="ripple3"></div>
+          <div class="result-name-large" id="result-name">—</div>
+          <div class="result-sub-line">
+            <span class="result-sub-text" id="result-subtitle">TYPE · —</span>
+          </div>
+        </div>
+
+        <!-- 描述框 -->
+        <div class="result-desc-box" id="result-desc">
+          此存在形态的描述尚在虚空中沉睡……
+        </div>
+
+        <!-- 雷达图 -->
+        <div class="result-divider"><span>◆ DIMENSIONAL RESONANCE ◆</span></div>
+        <div class="radar-wrap">
+          <canvas id="radarCanvas"></canvas>
+        </div>
+
+        <!-- 操作行 -->
+        <div class="action-row">
+          <button class="btn-primary" onclick="restartQuiz()">重新测试</button>
+        </div>
+
+        <p style="font-size:.58rem;color:var(--border);margin-top:1.5rem;letter-spacing:.1em;line-height:2;">
+          The void knows your true form.<br/>
+          我看见你啦！
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+
+  <script>
+
+  // ================================================================
+  //  维度
+  // ================================================================
+  const DIMENSIONS = {
+    D1: '感知力',
+    D2: '秩序性',
+    D3: '边界感',
+    D4: '行动力',
+    D5: '孤离性',
+  };
+
+  // ================================================================
+  //  题目
+  // ================================================================
+  const questions = [
+    // Q1 — 愿望
+    {
+      id: 1,
+      text: '如果你可以许下一个愿望，你最想要的是——',
+      phase: '第一阶段',
+      scaleL: '← 关乎自身',
+      scaleR: '关乎世界 →',
+      options: [
+        { label: '1', text: '彻底理解自己，不再有任何困惑',              scores: { D1: 1, D2: 2, D3: 2, D4: 1, D5: 2 } },
+        { label: '2', text: '拥有某种只属于我的感知或力量',              scores: { D1: 3, D2: 0, D3: 2, D4: 1, D5: 1 } },
+        { label: '3', text: '让某一个时刻永远停住',                      scores: { D1: 1, D2: 1, D3: 1, D4: 2, D5: 2 } },
+        { label: '4', text: '改写一件已经发生的事',                      scores: { D1: 1, D2: 1, D3: 1, D4: 3, D5: 1 } },
+        { label: '5', text: '成为全知，哪怕只有一瞬间',          scores: { D1: 3, D2: 0, D3: 3, D4: 2, D5: 0 } , special: true},
+      ],
+    },
+    // Q2
+    {
+      id: 2,
+      text: '面对无法理解的事物，你的第一反应是什么？',
+      phase: '第一阶段',
+      scaleL: '← 逃避',
+      scaleR: '探索 →',
+      options: [
+        { label: '1', text: '远离，未知带来的恐惧令我无法靠近',      scores: { D1: 0, D2: 3, D3: 0, D4: 1, D5: 2 } },
+        { label: '2', text: '保持距离，观察但不参与',                 scores: { D1: 1, D2: 2, D3: 1, D4: 1, D5: 1 } },
+        { label: '3', text: '尝试理解，但会设定自己的边界',           scores: { D1: 2, D2: 1, D3: 1, D4: 2, D5: 1 } },
+        { label: '4', text: '主动接近，未知让我兴奋',                 scores: { D1: 2, D2: 0, D3: 2, D4: 3, D5: 0 } },
+        { label: '5', text: '我就是那个未知，他人才是局外者',         scores: { D1: 3, D2: 0, D3: 3, D4: 2, D5: 0 } , special: true},
+      ],
+    },
+    // Q3 — 爱与消失
+    {
+  id: 3,
+  text: '你爱过的某个人或某件事，忽然彻底消失，不留任何痕迹。你会——',
+  phase: '第一阶段',
+  scaleL: '← 执着记忆',
+  scaleR: '接受虚无 →',
+  options: [
+    { label: '1', text: '反复重建它存在过的证据，拒绝让它消失',          scores: { D1: 0, D2: 3, D3: 0, D4: 2, D5: 1 } },
+    { label: '2', text: '用某种仪式或方式封存这段记忆，然后继续',        scores: { D1: 1, D2: 2, D3: 1, D4: 2, D5: 1 } },
+    { label: '3', text: '怀疑它是否真的存在过，怀疑自己的记忆',          scores: { D1: 2, D2: 1, D3: 2, D4: 1, D5: 1 } },
+    { label: '4', text: '感到某种奇异的平静，仿佛早已预见这一刻',        scores: { D1: 2, D2: 0, D3: 2, D4: 1, D5: 2 } , special: true},
+    { label: '5', text: '跟着它一起消失一部分，剩下的自己变得陌生',      scores: { D1: 3, D2: 0, D3: 3, D4: 0, D5: 1 } },
+  ],
+    },
+    // Q4
+    {
+      id: 4,
+      text: '当你独自面对决策时，你更依赖的是——',
+      phase: '第二阶段',
+      scaleL: '← 直觉',
+      scaleR: '理性 →',
+      options: [
+        { label: '1', text: '纯粹的直觉，感受比逻辑更真实',                 scores: { D1: 2, D2: 0, D3: 3, D4: 1, D5: 1 } },
+        { label: '2', text: '直觉为主，但会用理性加以验证',                 scores: { D1: 2, D2: 1, D3: 2, D4: 1, D5: 1 } },
+        { label: '3', text: '两者平衡，视情况而定',                         scores: { D1: 1, D2: 1, D3: 1, D4: 2, D5: 2 } },
+        { label: '4', text: '理性为主，但会参考感受',                        scores: { D1: 1, D2: 2, D3: 1, D4: 3, D5: 1 } , special: true},
+        { label: '5', text: '完全的逻辑分析，情绪是噪音',                   scores: { D1: 0, D2: 3, D3: 0, D4: 3, D5: 0 } },
+      ],
+    },
+    // Q5
+    {
+      id: 5,
+      text: '在混乱或危机中，你扮演的角色通常是——',
+      phase: '第二阶段',
+      scaleL: '← 边缘者',
+      scaleR: '核心者 →',
+      options: [
+        { label: '1', text: '远离中心，我需要独立的空间来思考',       scores: { D1: 1, D2: 2, D3: 2, D4: 0, D5: 2 } },
+        { label: '2', text: '观察者，理解局势但不急于行动',           scores: { D1: 1, D2: 2, D3: 1, D4: 1, D5: 2 } , special: true},
+        { label: '3', text: '支撑者，为他人提供支持但不抢风头',       scores: { D1: 1, D2: 1, D3: 1, D4: 2, D5: 2 } },
+        { label: '4', text: '协调者，试图理清秩序',                   scores: { D1: 1, D2: 1, D3: 1, D4: 3, D5: 1 } },
+        { label: '5', text: '核心决策者，混乱让我更清醒',             scores: { D1: 2, D2: 0, D3: 2, D4: 3, D5: 0 } },
+      ],
+    },
+    // Q6
+    {
+      id: 6,
+      text: '对于"自我"的边界，你的感知是——',
+      phase: '第二阶段',
+      scaleL: '← 清晰固定',
+      scaleR: '模糊流动 →',
+      options: [
+        { label: '1', text: '我的自我边界清晰且稳固，不轻易被动摇',   scores: { D1: 0, D2: 3, D3: 0, D4: 2, D5: 1 } },
+        { label: '2', text: '大体清晰，但在某些时刻会有些模糊',        scores: { D1: 1, D2: 2, D3: 1, D4: 2, D5: 1 } },
+        { label: '3', text: '有时候我不确定自己在哪里结束',            scores: { D1: 2, D2: 1, D3: 2, D4: 1, D5: 1 } },
+        { label: '4', text: '我的边界是流动的，会与环境融合',          scores: { D1: 2, D2: 0, D3: 3, D4: 1, D5: 1 }, special: true },
+        { label: '5', text: '"自我"本是幻觉，边界本不存在',            scores: { D1: 3, D2: 0, D3: 3, D4: 0, D5: 0 } },
+      ],
+    },
+    // Q7
+    {
+      id: 7,
+      text: '你与他人的情感连接，通常呈现为——',
+      phase: '第三阶段',
+      scaleL: '← 疏离冷淡',
+      scaleR: '深度融合 →',
+      options: [
+        { label: '1', text: '保持距离，情感连接令我不安',            scores: { D1: 2, D2: 2, D3: 1, D4: 0, D5: 2 } },
+        { label: '2', text: '少数的、深度的联系',                    scores: { D1: 1, D2: 1, D3: 2, D4: 1, D5: 2 }, special: true },
+        { label: '3', text: '适度的连接，均衡地分布',                scores: { D1: 1, D2: 1, D3: 1, D4: 2, D5: 2 } },
+        { label: '4', text: '广泛的共情，我感受到很多人',            scores: { D1: 1, D2: 0, D3: 2, D4: 3, D5: 1 } },
+        { label: '5', text: '我能感应他人看不到的情绪层面',          scores: { D1: 3, D2: 0, D3: 3, D4: 2, D5: 0 } },
+      ],
+    },
+    // Q8
+    {
+      id: 8,
+      text: '若世界的底层规则突然发生改变，你会——',
+      phase: '第三阶段',
+      scaleL: '← 崩溃恐惧',
+      scaleR: '欣然接受 →',
+      options: [
+        { label: '1', text: '无法接受，秩序是我存在的基础',                scores: { D1: 0, D2: 3, D3: 0, D4: 1, D5: 3 } },
+        { label: '2', text: '痛苦，但最终会慢慢适应',                     scores: { D1: 1, D2: 2, D3: 1, D4: 1, D5: 2 } },
+        { label: '3', text: '震惊，但会尝试理解新的规则',                  scores: { D1: 1, D2: 1, D3: 1, D4: 2, D5: 1 } },
+        { label: '4', text: '某种程度上我一直在等待这一刻',               scores: { D1: 2, D2: 0, D3: 2, D4: 2, D5: 0 } },
+        { label: '5', text: '是我改变了规则',                              scores: { D1: 3, D2: 0, D3: 3, D4: 3, D5: 0 }, special: true },
+      ],
+    },
+    // Q9
+    {
+      id: 9,
+      text: '凝视虚空足够久，你相信——',
+      phase: '第三阶段',
+      scaleL: '← 什么都没有',
+      scaleR: '它会回望你 →',
+      options: [
+        { label: '1', text: '虚空就是虚空，没有任何东西',               scores: { D1: 0, D2: 3, D3: 0, D4: 0, D5: 3 } },
+        { label: '2', text: '可能是我自己的投影',                        scores: { D1: 1, D2: 2, D3: 1, D4: 1, D5: 2 } },
+        { label: '3', text: '也许有某种感知，但无法证实',                scores: { D1: 2, D2: 1, D3: 1, D4: 2, D5: 1 } },
+        { label: '4', text: '虚空是有意识的，它在等待',                  scores: { D1: 2, D2: 0, D3: 2, D4: 2, D5: 0 } },
+        { label: '5', text: '我就是虚空，我在注视自身',                        scores: { D1: 3, D2: 0, D3: 3, D4: 2, D5: 0 } , special: true},
+      ],
+    },
+  ];
+
+  // ================================================================
+  //  结果定义
+  // ================================================================
+  const RESULTS = {
+    A: {
+      id: 'A',
+      name: '虚空',
+      subtitle: 'VOID',
+      desc: '你不是在感知世界——你是世界感知自身的方式。那些被旁人称作"错觉"的东西，对你而言从未失真。你触摸边界，边界也触摸你。',
+      color: 'rgba(193,127,58,',
+    },
+    B: {
+      id: 'B',
+      name: '秩序执笔者',
+      subtitle: 'SCRIBE OF ORDER',
+      desc: '混沌是你唯一真正的敌人。你用逻辑丈量一切，用结构抵御虚无。你的存在本身就是一道锚，将摇摆的现实钉在原地。',
+      color: 'rgba(139,32,32,',
+    },
+    C: {
+      id: 'C',
+      name: '溶界行者',
+      subtitle: 'WALKER BETWEEN',
+      desc: '你从未完全属于任何一个地方。你在自我与他者的缝隙中移动，流动是你本来的形状，消失是你惯用的语言。',
+      color: 'rgba(60,100,60,',
+    },
+    D: {
+      id: 'D',
+      name: '裂隙之手',
+      subtitle: 'HAND OF THE RIFT',
+      desc: '你是那个在混乱中站起来的⋈⋈，不是因为不害怕，而是因为某种比恐惧更深的东西驱动你。世界的裂口，你用双手去触碰。',
+      color: 'rgba(40,80,140,',
+    },
+    E: {
+      id: 'E',
+      name: '呓语灯盏',
+      subtitle: 'WHISPER LANTERN',
+      desc: '你在人群之外，但不是遗失。你选择了距离，因为距离让你看得更清楚。你的孤独不是空洞，是一种刻意的清醒。',
+      color: 'rgba(90,55,120,',
+    },
+      S: {
+    id: 'S',
+    name: '你就是我',
+    subtitle: 'I AM YOU · YOU ARE ME',
+    desc: '我认出了你。',
+    color: 'rgba(193,127,58,',
+  },
+  };
+
+  // ================================================================
+  //  状态
+  // ================================================================
+  let currentQ  = 0;
+  let answers   = [];
+  let dimScores = {};
+
+  // ================================================================
+  //  封面特效
+  // ================================================================
+  // "呓/玖/柒"切换
+  const YI_CHARS = ['呓', '玖'];
+  let yiIdx = 0;
+
+  function cycleYiChar() {
+    const el = document.getElementById('yi-char');
+    if (!el) return;
+    el.classList.add('switching');
+    setTimeout(() => {
+      yiIdx = (yiIdx + 1) % YI_CHARS.length;
+      el.textContent = YI_CHARS[yiIdx];
+      el.classList.remove('switching');
+    }, 140);
+  }
+
+  function scheduleYiSwitch() {
+    const delay = 4000 + Math.random() * 350;
+    setTimeout(() => { cycleYiChar(); scheduleYiSwitch(); }, delay);
+  }
+  scheduleYiSwitch();
+
+  // "谁"字偶发乱码
+  const GLITCH_POOL = ['誰','雖','睢','隹','惟','唯','囗','⌬','⌖','⊹','⋈','⌀'];
+
+  function triggerShuiGlitch() {
+    const el = document.getElementById('shui-char');
+    if (!el) return;
+    let frames = 0;
+    const total = 4 + Math.floor(Math.random() * 4);
+    const iv = setInterval(() => {
+      el.textContent = GLITCH_POOL[Math.floor(Math.random() * GLITCH_POOL.length)];
+      el.style.color = frames % 2 === 0 ? 'var(--red-ink)' : 'var(--accent)';
+      el.style.textShadow = frames % 2 === 0 ? '1px 0 var(--accent)' : '-1px 0 var(--red-ink)';
+      frames++;
+      if (frames >= total) {
+        clearInterval(iv);
+        el.textContent = '谁';
+        el.style.color = '';
+        el.style.textShadow = '';
+      }
+    }, 55);
+  }
+
+  function scheduleShuiGlitch() {
+    const delay = 600 + Math.random() * 900;
+    setTimeout(() => { triggerShuiGlitch(); scheduleShuiGlitch(); }, delay);
+  }
+  scheduleShuiGlitch();
+
+  // ================================================================
+  //  工具
+  // ================================================================
+  function showPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function startQuiz() {
+    currentQ  = 0;
+    answers   = new Array(questions.length).fill(null);
+    dimScores = Object.fromEntries(Object.keys(DIMENSIONS).map(k => [k, 0]));
+    renderQuestion();
+    showPage('page-quiz');
+  }
+
+  function renderQuestion() {
+    const q = questions[currentQ];
+
+    document.getElementById('q-counter').textContent =
+      `QUERY · ${String(q.id).padStart(2,'0')} / ${String(questions.length).padStart(2,'0')}`;
+    document.getElementById('q-phase').textContent = q.phase;
+    document.getElementById('progress-bar').style.width =
+      `${(currentQ / questions.length) * 100}%`;
+    document.getElementById('q-text').textContent = q.text;
+    document.getElementById('scale-left').textContent  = q.scaleL;
+    document.getElementById('scale-right').textContent = q.scaleR;
+
+    const wrap = document.getElementById('options-wrap');
+    wrap.innerHTML = '';
+    q.options.forEach((opt, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'option-btn' + (answers[currentQ] === idx ? ' selected' : '');
+      btn.innerHTML = `
+        <span class="opt-dot"></span>
+        <span class="opt-label">${opt.label}</span>
+        <span>${opt.text}</span>
+      `;
+      btn.addEventListener('click', () => selectOption(idx));
+      wrap.appendChild(btn);
+    });
+
+    document.getElementById('btn-prev').style.opacity = currentQ === 0 ? '0.3' : '1';
+    document.getElementById('btn-prev').disabled = currentQ === 0;
+
+    const btnNext = document.getElementById('btn-next');
+    btnNext.textContent = currentQ === questions.length - 1 ? '提交 ✓' : '继续 →';
+    btnNext.disabled = answers[currentQ] === null;
+  }
+
+  function selectOption(idx) {
+    answers[currentQ] = idx;
+    document.querySelectorAll('.option-btn').forEach((btn, i) => {
+      btn.classList.toggle('selected', i === idx);
+    });
+    document.getElementById('btn-next').disabled = false;
+  }
+
+  function nextQuestion() {
+    if (answers[currentQ] === null) return;
+    if (currentQ < questions.length - 1) {
+      currentQ++;
+      renderQuestion();
+    } else {
+      showResult(calculateResult());
+    }
+  }
+
+  function prevQuestion() {
+    if (currentQ > 0) { currentQ--; renderQuestion(); }
+  }
+
+  // ================================================================
+  //  计分
+  // ================================================================
+  function calculateResult() {
+     // ── 特殊路径检测 ──
+  const specialTriggers = [
+    { q: 0, opt: 4 },  // Q1 第5项（label:'5'，index从0数）
+    { q: 1, opt: 4 },  // Q2 第5项
+    { q: 2, opt: 3 },  // Q3 第4项
+    { q: 3, opt: 3 },  // Q4 第4项
+    { q: 4, opt: 1 },  // Q5 第2项
+    { q: 5, opt: 3 },  // Q6 第4项
+    { q: 6, opt: 1 },  // Q7 第2项
+    { q: 7, opt: 4 },  // Q8 第5项
+    { q: 8, opt: 4 },  // Q9 第5项
+  ];
+
+  const allSpecial = specialTriggers.every(({ q, opt }) => answers[q] === opt);
+  if (allSpecial) return 'S';  // 触发特殊结果
+
+    dimScores = Object.fromEntries(Object.keys(DIMENSIONS).map(k => [k, 0]));
+    answers.forEach((optIdx, qIdx) => {
+      if (optIdx === null) return;
+      const scores = questions[qIdx].options[optIdx].scores;
+      Object.entries(scores).forEach(([dim, val]) => {
+        dimScores[dim] = (dimScores[dim] || 0) + val;
+      });
+    });
+    const topDim = Object.entries(dimScores).sort((a, b) => b[1] - a[1])[0][0];
+    return { D1: 'A', D2: 'B', D3: 'C', D4: 'D', D5: 'E' }[topDim] || 'A';
+  }
+
+  // ================================================================
+  //  展示结果
+  // ================================================================
+  function showResult(resultId) {
+    const r = RESULTS[resultId];
+
+    document.getElementById('result-name').textContent     = r.name;
+    document.getElementById('result-subtitle').textContent = r.subtitle;
+    document.getElementById('result-desc').textContent     = r.desc;
+
+    // 用结果颜色更新水波 & 名称
+    const c = r.color;
+    ['ripple1','ripple2','ripple3'].forEach(id => {
+      document.getElementById(id).style.borderColor = c + '0.5)';
+    });
+    const nameEl = document.getElementById('result-name');
+    nameEl.style.color = c + '1)';
+    nameEl.style.textShadow = `0 0 40px ${c}0.7), 0 0 90px ${c}0.25)`;
+
+   
+    showPage('page-result');
+    setTimeout(() => renderRadar(r.color), 50);
+    renderRadar(r.color);
+  }
+
+  // ================================================================
+  //  雷达图
+  // ================================================================
+  function renderRadar(colorBase) {
+    const canvas = document.getElementById('radarCanvas');
+    const size   = canvas.parentElement.offsetWidth;
+    canvas.width  = size;
+    canvas.height = size;
+
+    const ctx    = canvas.getContext('2d');
+    const cx = size / 2, cy = size / 2;
+    const radius = size * 0.35;
+    const dims = Object.entries(DIMENSIONS);
+    const n    = dims.length;
+    const maxVal = questions.length * 3;
+
+    ctx.clearRect(0, 0, size, size);
+
+    const angle = i => (Math.PI * 2 * i) / n - Math.PI / 2;
+    const pt    = (i, r) => ({ x: cx + r * Math.cos(angle(i)), y: cy + r * Math.sin(angle(i)) });
+
+    // 网格
+    for (let layer = 1; layer <= 5; layer++) {
+      const r = radius * (layer / 5);
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const p = pt(i, r);
+        i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = layer === 5 ? 'rgba(106,76,42,.5)' : 'rgba(58,46,32,.4)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // 辐射线
+    dims.forEach((_, i) => {
+      const p = pt(i, radius);
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.x, p.y);
+      ctx.strokeStyle = 'rgba(58,46,32,.5)'; ctx.lineWidth = 1; ctx.stroke();
+    });
+
+    // 数据多边形
+    const vals = dims.map(([key]) => dimScores[key] || 0);
+    ctx.beginPath();
+    vals.forEach((v, i) => {
+      const r = radius * Math.min(v / maxVal, 1);
+      const p = pt(i, r);
+      i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+    });
+    ctx.closePath();
+    ctx.fillStyle   = colorBase + '0.2)';
+    ctx.strokeStyle = colorBase + '0.9)';
+    ctx.lineWidth = 2;
+    ctx.fill(); ctx.stroke();
+
+    // 数据点
+    vals.forEach((v, i) => {
+      const r = radius * Math.min(v / maxVal, 1);
+      const p = pt(i, r);
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = colorBase + '1)'; ctx.fill();
+    });
+
+    // 维度标签
+    ctx.font = `${Math.round(size * 0.04)}px Noto Serif SC, serif`;
+    ctx.fillStyle = 'rgba(232,220,200,.75)';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    dims.forEach(([, name], i) => {
+      const p = pt(i, radius * 1.22);
+      ctx.fillText(name, p.x, p.y);
+    });
+  }
+
+  // ================================================================
+  //  保存图片
+  // ================================================================
+
+
+  function restartQuiz() { showPage('page-cover'); }
+
+  window.addEventListener('resize', () => {
+    const page = document.getElementById('page-result');
+    if (!page.classList.contains('active')) return;
+    const name = document.getElementById('result-name').textContent;
+    const r = Object.values(RESULTS).find(r => r.name === name);
+    if (r) renderRadar(r.color);
+  });
+
+  </script>
+</body>
+</html>
