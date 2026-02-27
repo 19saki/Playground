@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THE COCKPIT RULE — AI 协同决策</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0b;
+    --surface: #111113;
+    --border: #1e1e22;
+    --amber: #f5a623;
+    --amber-dim: #7a5210;
+    --green: #39d98a;
+    --blue: #4f9eff;
+    --red: #ff4d6d;
+    --purple: #c77dff;
+    --text: #e8e8ea;
+    --text-dim: #555560;
+    --text-mid: #8888a0;
+    --track: #1c1c22;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(245,166,35,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(245,166,35,0.025) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    width: 100%;
+    max-width: 1120px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .header { margin-bottom: 44px; }
+
+  .eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .eyebrow::before { content: ''; width: 24px; height: 1px; background: var(--amber); }
+
+  h1 { font-size: clamp(26px, 4.5vw, 44px); font-weight: 800; line-height: 1.1; }
+  h1 span { color: var(--amber); }
+
+  .subtitle {
+    margin-top: 10px;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.08em;
+  }
+
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 820px) { .main { grid-template-columns: 1fr; } }
+
+  .controls-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .controls-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--amber-dim), transparent);
+  }
+
+  .slider-group { margin-bottom: 32px; }
+  .slider-group:last-child { margin-bottom: 0; }
+
+  .slider-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .slider-label {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .slider-label.c-amber { color: var(--amber); }
+  .slider-label.c-green  { color: var(--green); }
+  .slider-label.c-blue   { color: var(--blue); }
+  .slider-label.c-red    { color: var(--red); }
+  .slider-label.c-purple { color: var(--purple); }
+
+  .slider-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 14px;
+    border-radius: 6px;
+    min-width: 110px;
+    text-align: center;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+    border: 1px solid;
+  }
+  .slider-value.c-amber  { background: rgba(245,166,35,0.08);  border-color: rgba(245,166,35,0.3);  color: var(--amber); }
+  .slider-value.c-green  { background: rgba(57,217,138,0.08);  border-color: rgba(57,217,138,0.3);  color: var(--green); }
+  .slider-value.c-blue   { background: rgba(79,158,255,0.08);  border-color: rgba(79,158,255,0.3);  color: var(--blue); }
+  .slider-value.c-red    { background: rgba(255,77,109,0.08);  border-color: rgba(255,77,109,0.3);  color: var(--red); }
+  .slider-value.c-purple { background: rgba(199,125,255,0.08); border-color: rgba(199,125,255,0.3); color: var(--purple); }
+
+  /* Range slider */
+  .range-wrap { position: relative; padding: 8px 0; }
+
+  .range-track {
+    position: absolute;
+    top: 50%; left: 0; right: 0;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--track);
+    transform: translateY(-50%);
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .range-track-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.04s linear;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 3px;
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+    background: transparent;
+    position: relative;
+    z-index: 2;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 2px solid var(--amber);
+    box-shadow: 0 0 10px rgba(245,166,35,0.5), 0 0 0 3px rgba(245,166,35,0.08);
+    cursor: grab;
+    transition: box-shadow 0.2s, transform 0.15s;
+  }
+  input[type=range]:hover::-webkit-slider-thumb {
+    box-shadow: 0 0 18px rgba(245,166,35,0.7), 0 0 0 6px rgba(245,166,35,0.1);
+  }
+  input[type=range]:active::-webkit-slider-thumb { cursor: grabbing; transform: scale(1.2); }
+
+  input[type=range].c-green::-webkit-slider-thumb  { border-color: var(--green);  box-shadow: 0 0 10px rgba(57,217,138,0.5),  0 0 0 3px rgba(57,217,138,0.08); }
+  input[type=range].c-blue::-webkit-slider-thumb   { border-color: var(--blue);   box-shadow: 0 0 10px rgba(79,158,255,0.5),  0 0 0 3px rgba(79,158,255,0.08); }
+  input[type=range].c-red::-webkit-slider-thumb    { border-color: var(--red);    box-shadow: 0 0 10px rgba(255,77,109,0.5),  0 0 0 3px rgba(255,77,109,0.08); }
+  input[type=range].c-purple::-webkit-slider-thumb { border-color: var(--purple); box-shadow: 0 0 10px rgba(199,125,255,0.5), 0 0 0 3px rgba(199,125,255,0.08); }
+
+  input[type=range].c-green:hover::-webkit-slider-thumb  { box-shadow: 0 0 18px rgba(57,217,138,0.7),  0 0 0 6px rgba(57,217,138,0.1); }
+  input[type=range].c-blue:hover::-webkit-slider-thumb   { box-shadow: 0 0 18px rgba(79,158,255,0.7),  0 0 0 6px rgba(79,158,255,0.1); }
+  input[type=range].c-red:hover::-webkit-slider-thumb    { box-shadow: 0 0 18px rgba(255,77,109,0.7),  0 0 0 6px rgba(255,77,109,0.1); }
+  input[type=range].c-purple:hover::-webkit-slider-thumb { box-shadow: 0 0 18px rgba(199,125,255,0.7), 0 0 0 6px rgba(199,125,255,0.1); }
+
+  input[type=range].c-green:active::-webkit-slider-thumb  { transform: scale(1.2); }
+  input[type=range].c-blue:active::-webkit-slider-thumb   { transform: scale(1.2); }
+  input[type=range].c-red:active::-webkit-slider-thumb    { transform: scale(1.2); }
+  input[type=range].c-purple:active::-webkit-slider-thumb { transform: scale(1.2); }
+
+  .range-ticks {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 10px;
+    margin-top: 5px;
+  }
+  .range-ticks span { width: 1px; height: 4px; background: var(--border); display: block; }
+
+  .range-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
+
+  .divider { height: 1px; background: var(--border); margin: 26px 0; }
+
+  /* Result panel */
+  .result-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    position: sticky;
+    top: 40px;
+    overflow: hidden;
+    transition: border-color 0.45s ease, box-shadow 0.45s ease;
+  }
+
+  .result-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.28em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .mode-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 18px;
+    transition: all 0.35s ease;
+    border: 1px solid;
+  }
+  .mode-badge .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.6); }
+  }
+
+  .result-mode {
+    font-size: 26px;
+    font-weight: 800;
+    margin-bottom: 12px;
+    font-family: 'Space Mono', monospace;
+    transition: color 0.35s ease;
+    line-height: 1.2;
+  }
+
+  .result-desc {
+    font-size: 12.5px;
+    color: var(--text-mid);
+    line-height: 1.75;
+    margin-bottom: 20px;
+    font-weight: 400;
+  }
+
+  .mode-axis {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .axis-cell {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+  }
+  .axis-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .axis-cell-val { font-size: 11.5px; font-weight: 600; color: var(--text); }
+
+  .tips-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .tip-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 9px;
+    font-size: 12px;
+    color: var(--text-mid);
+    line-height: 1.55;
+  }
+  .tip-icon { flex-shrink: 0; margin-top: 1px; font-size: 11px; }
+
+  .score-section {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+  }
+  .score-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .score-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--text-dim);
+    width: 72px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .score-bar-wrap { flex: 1; height: 3px; background: var(--track); border-radius: 2px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+  .score-val { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--text-mid); width: 32px; text-align: right; }
+
+  .result-panel.glow-amber { border-color: rgba(245,166,35,0.28);  box-shadow: 0 0 50px rgba(245,166,35,0.055); }
+  .result-panel.glow-green  { border-color: rgba(57,217,138,0.28);  box-shadow: 0 0 50px rgba(57,217,138,0.055); }
+  .result-panel.glow-blue   { border-color: rgba(79,158,255,0.28);  box-shadow: 0 0 50px rgba(79,158,255,0.055); }
+  .result-panel.glow-red    { border-color: rgba(255,77,109,0.28);  box-shadow: 0 0 50px rgba(255,77,109,0.055); }
+  .result-panel.glow-purple { border-color: rgba(199,125,255,0.28); box-shadow: 0 0 50px rgba(199,125,255,0.055); }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="header">
+    <div class="eyebrow">The Cockpit Rule</div>
+    <h1>当前任务，<span>如何与 AI 协同？</span></h1>
+    <div class="subtitle">// 拖动滑块 → 实时获得最优协作策略</div>
+  </div>
+
+  <div class="main">
+    <div class="controls-panel">
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <div class="slider-label c-amber"><span>⏱</span> 人工完成基准时间</div>
+          <div class="slider-value c-amber" id="val-time">—</div>
+        </div>
+        <div class="range-wrap">
+          <div class="range-track"><div class="range-track-fill" id="fill-time" style="background:var(--amber)"></div></div>
+          <input type="range" id="s-time" min="0" max="100" step="1" value="35">
+        </div>
+        <div class="range-ticks" id="ticks-time"></div>
+        <div class="range-labels"><span>几分钟</span><span>数天以上</span></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <div class="slider-label c-green"><span>🎯</span> AI 成功概率</div>
+          <div class="slider-value c-green" id="val-prob">—</div>
+        </div>
+        <div class="range-wrap">
+          <div class="range-track"><div class="range-track-fill" id="fill-prob" style="background:var(--green)"></div></div>
+          <input type="range" class="c-green" id="s-prob" min="0" max="100" step="1" value="50">
+        </div>
+        <div class="range-ticks" id="ticks-prob"></div>
+        <div class="range-labels"><span>几乎不可能</span><span>极高</span></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <div class="slider-label c-blue"><span>🔄</span> AI 处理耗时</div>
+          <div class="slider-value c-blue" id="val-aitime">—</div>
+        </div>
+        <div class="range-wrap">
+          <div class="range-track"><div class="range-track-fill" id="fill-aitime" style="background:var(--blue)"></div></div>
+          <input type="range" class="c-blue" id="s-aitime" min="0" max="100" step="1" value="10">
+        </div>
+        <div class="range-ticks" id="ticks-aitime"></div>
+        <div class="range-labels"><span>秒级响应</span><span>数小时以上</span></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <div class="slider-label c-red"><span>⚠️</span> 出错代价</div>
+          <div class="slider-value c-red" id="val-risk">—</div>
+        </div>
+        <div class="range-wrap">
+          <div class="range-track"><div class="range-track-fill" id="fill-risk" style="background:var(--red)"></div></div>
+          <input type="range" class="c-red" id="s-risk" min="0" max="100" step="1" value="30">
+        </div>
+        <div class="range-ticks" id="ticks-risk"></div>
+        <div class="range-labels"><span>无所谓</span><span>灾难性后果</span></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <div class="slider-label c-purple"><span>🧠</span> 所需创意 / 主观判断</div>
+          <div class="slider-value c-purple" id="val-creative">—</div>
+        </div>
+        <div class="range-wrap">
+          <div class="range-track"><div class="range-track-fill" id="fill-creative" style="background:var(--purple)"></div></div>
+          <input type="range" class="c-purple" id="s-creative" min="0" max="100" step="1" value="25">
+        </div>
+        <div class="range-ticks" id="ticks-creative"></div>
+        <div class="range-labels"><span>纯执行 / 有明确答案</span><span>高度创意 / 强主观</span></div>
+      </div>
+
+    </div>
+
+    <div class="result-panel" id="result-panel">
+      <div class="result-eyebrow">RESULT</div>
+      <div class="mode-badge" id="mode-badge">
+        <span class="dot" id="mode-dot"></span>
+        <span id="mode-tag">计算中</span>
+      </div>
+      <div class="result-mode" id="result-mode">—</div>
+      <div class="result-desc" id="result-desc"></div>
+      <div class="mode-axis" id="mode-axis"></div>
+      <div class="tips-title">// 行动建议</div>
+      <div id="tips-container"></div>
+      <div class="score-section">
+        <div class="tips-title">// 综合分析</div>
+        <div class="score-row">
+          <div class="score-label">时间收益</div>
+          <div class="score-bar-wrap"><div class="score-bar-fill" id="bar-time" style="background:var(--amber)"></div></div>
+          <div class="score-val" id="sv-time">—</div>
+        </div>
+        <div class="score-row">
+          <div class="score-label">AI 胜任度</div>
+          <div class="score-bar-wrap"><div class="score-bar-fill" id="bar-ai" style="background:var(--green)"></div></div>
+          <div class="score-val" id="sv-ai">—</div>
+        </div>
+        <div class="score-row">
+          <div class="score-label">安全余量</div>
+          <div class="score-bar-wrap"><div class="score-bar-fill" id="bar-safe"></div></div>
+          <div class="score-val" id="sv-safe">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const MODES = {
+  manual: {
+    tag: '手动模式', label: 'Manual Mode', color: 'red',
+    desc: 'AI 在这里帮不上忙，甚至会添麻烦。任务要么太小（不值得折腾 prompt），要么风险极高而 AI 胜算极低——错一次代价太大。自己来。',
+    axis: [
+      { label: 'AI 介入度', val: '❌ 不引入' },
+      { label: '谁来主导', val: '👤 100% 人工' },
+      { label: '审查方式', val: '— 不需要' },
+      { label: '适用场景', val: '极短任务 / 高危决策' },
+    ],
+    tips: [
+      { icon: '✋', text: '完全由人完成，AI 不参与任何环节' },
+      { icon: '📝', text: '如果任务重复出现，记录 SOP 以备未来再评估自动化' },
+      { icon: '🔒', text: '若涉及高风险原因是合规/数据安全，明确边界' },
+    ]
+  },
+  assist: {
+    tag: '辅助模式', label: 'Assist Mode', color: 'amber',
+    desc: 'AI 可以帮你打开思路、生成草稿或列举选项，但最终内容必须经过人的大幅改写和判断。AI 是参考工具，不是交付者。',
+    axis: [
+      { label: 'AI 介入度', val: '🟡 轻度参与' },
+      { label: '谁来主导', val: '👤 人主导' },
+      { label: '审查方式', val: '✏️ 人完全重写' },
+      { label: '适用场景', val: '中高风险 / 强主观' },
+    ],
+    tips: [
+      { icon: '💡', text: '用 AI 做头脑风暴和草稿，不要直接用输出' },
+      { icon: '✍️', text: '把 AI 的内容视为「原材料」，人工深度加工' },
+      { icon: '🚫', text: '不要把 AI 输出直接交付给他人，务必亲眼过一遍' },
+    ]
+  },
+  collab: {
+    tag: '协作模式', label: 'Collaboration Mode', color: 'blue',
+    desc: '人与 AI 明确分工、反复迭代。AI 负责结构化执行，人负责方向判断与创意把关。适合中等复杂度、有一定风险但可控的任务。',
+    axis: [
+      { label: 'AI 介入度', val: '🔵 深度协同' },
+      { label: '谁来主导', val: '👥 人/AI 各半' },
+      { label: '审查方式', val: '🔍 节点 Review' },
+      { label: '适用场景', val: '复杂任务 / 中等风险' },
+    ],
+    tips: [
+      { icon: '🤝', text: '开始前明确分工：AI 处理哪部分，人决策哪部分' },
+      { icon: '🔍', text: '设置 2-3 个检查节点，不要等全部完成再 review' },
+      { icon: '⚡', text: '可以并行多个 AI 线程，人做最终整合' },
+    ]
+  },
+  supervised: {
+    tag: '监督模式', label: 'Supervised Mode', color: 'purple',
+    // KEY DISTINCTION FROM AUTOPILOT: AI executes but human watches every step because risk is HIGH
+    desc: 'AI 有能力执行，但风险太高——任何一步出错都需要立刻干预。人要全程实时盯着每一个动作，像监考官。这不是放手，是紧密看管下的 AI 执行。',
+    axis: [
+      { label: 'AI 介入度', val: '🟣 AI 执行' },
+      { label: '谁来主导', val: '👁 人实时监控' },
+      { label: '审查方式', val: '⚡ 逐步实时审' },
+      { label: '适用场景', val: '高风险 + AI 能力强' },
+    ],
+    tips: [
+      { icon: '👁', text: '逐步审查 AI 的每一步输出，不要等最终结果' },
+      { icon: '🧪', text: '在沙盒/测试环境先跑一遍再上正式环境' },
+      { icon: '🛑', text: '随时准备手动接管，设置清晰的「叫停」标准' },
+    ]
+  },
+  autopilot: {
+    tag: '自动驾驶', label: 'Autopilot Mode', color: 'green',
+    // KEY DISTINCTION FROM SUPERVISED: low risk, so you walk away and only check at the end
+    desc: '完全放手。写好清晰的指令后直接去做别的事。风险低、成功率高、节省时间巨大——AI 独立完成全程，你只需事后抽检结果。真正的自动化。',
+    axis: [
+      { label: 'AI 介入度', val: '🟢 AI 全权' },
+      { label: '谁来主导', val: '🤖 AI 100%' },
+      { label: '审查方式', val: '✅ 事后抽检' },
+      { label: '适用场景', val: '低风险 + 高成功率' },
+    ],
+    tips: [
+      { icon: '🚀', text: '写好详细 prompt 后直接放手，无需等待' },
+      { icon: '✅', text: '事后随机抽查 10-20% 输出即可，不必逐一看' },
+      { icon: '📦', text: '模板化这个 prompt，批量复用，形成工作流' },
+    ]
+  }
+};
+
+// Supervised vs Autopilot in one sentence:
+// SUPERVISED  = AI能力强 + 风险高  → AI做，人盯着，随时叫停
+// AUTOPILOT   = AI能力强 + 风险低  → AI做，人不管，事后看结果
+
+const colorMap = {
+  amber:  { hex: '#f5a623', glow: 'glow-amber' },
+  green:  { hex: '#39d98a', glow: 'glow-green' },
+  blue:   { hex: '#4f9eff', glow: 'glow-blue' },
+  red:    { hex: '#ff4d6d', glow: 'glow-red' },
+  purple: { hex: '#c77dff', glow: 'glow-purple' },
+};
+
+function timeLabel(v) {
+  if (v < 8)  return '< 5 分钟';
+  if (v < 20) return '约 30 分钟';
+  if (v < 38) return '约 2 小时';
+  if (v < 55) return '半天';
+  if (v < 72) return '整整 1 天';
+  if (v < 88) return '2~3 天';
+  return '1 周以上';
+}
+function probLabel(v) {
+  if (v < 12) return '几乎不可能';
+  if (v < 28) return '成功率低';
+  if (v < 45) return '约 50/50';
+  if (v < 65) return '成功率较高';
+  if (v < 82) return '成功率高';
+  return '几乎必成';
+}
+function aitimeLabel(v) {
+  if (v < 10) return '< 1 分钟';
+  if (v < 25) return '~5 分钟';
+  if (v < 45) return '~30 分钟';
+  if (v < 65) return '1~2 小时';
+  if (v < 82) return '数小时';
+  return '> 半天';
+}
+function riskLabel(v) {
+  if (v < 12) return '无所谓';
+  if (v < 30) return '小麻烦';
+  if (v < 52) return '影响较大';
+  if (v < 72) return '严重影响';
+  if (v < 88) return '非常危险';
+  return '灾难性后果';
+}
+function creativeLabel(v) {
+  if (v < 12) return '纯执行任务';
+  if (v < 30) return '少量判断';
+  if (v < 52) return '中等主观性';
+  if (v < 72) return '需要专业判断';
+  if (v < 88) return '高度创意';
+  return '强烈主观 / 艺术性';
+}
+
+function decide(t, p, at, r, c) {
+  const T  = t  / 100;
+  const P  = p  / 100;
+  const AT = at / 100;
+  const R  = r  / 100;
+  const C  = c  / 100;
+
+  const timeSaving = T * (1 - AT * 0.5);
+  const aiComp = P * 0.75 + (1 - AT) * 0.25;
+  const safeMargin = (1 - R) * 0.6 + P * 0.4;
+
+  let mode;
+
+  // MANUAL: task too small to bother, OR catastrophic risk with low AI success
+  if (T < 0.09 || (R > 0.82 && P < 0.28) || (aiComp < 0.20 && R > 0.52)) {
+    mode = 'manual';
+  }
+  // AUTOPILOT: capable AI + LOW risk → walk away
+  else if (P > 0.70 && R < 0.30 && timeSaving > 0.32 && C < 0.45) {
+    mode = 'autopilot';
+  }
+  // SUPERVISED: capable AI + HIGH risk → AI executes but human watches every step
+  else if (P > 0.45 && R > 0.55) {
+    mode = 'supervised';
+  }
+  // COLLAB: middle ground
+  else if (aiComp > 0.38 && timeSaving > 0.18) {
+    mode = 'collab';
+  }
+  // ASSIST: AI barely helps or task is too subjective
+  else {
+    mode = 'assist';
+  }
+
+  return {
+    mode,
+    timeSaving: Math.round(timeSaving * 100),
+    aiComp:     Math.round(aiComp * 100),
+    safeMargin: Math.round(safeMargin * 100),
+  };
+}
+
+function makeTicks(id, n) {
+  const el = document.getElementById(id);
+  el.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const s = document.createElement('span');
+    el.appendChild(s);
+  }
+}
+
+function updateFill(inputId, fillId) {
+  const inp = document.getElementById(inputId);
+  const fill = document.getElementById(fillId);
+  const pct = ((inp.value - inp.min) / (inp.max - inp.min)) * 100;
+  fill.style.width = pct + '%';
+}
+
+function render() {
+  const t  = +document.getElementById('s-time').value;
+  const p  = +document.getElementById('s-prob').value;
+  const at = +document.getElementById('s-aitime').value;
+  const r  = +document.getElementById('s-risk').value;
+  const c  = +document.getElementById('s-creative').value;
+
+  document.getElementById('val-time').textContent     = timeLabel(t);
+  document.getElementById('val-prob').textContent     = probLabel(p);
+  document.getElementById('val-aitime').textContent   = aitimeLabel(at);
+  document.getElementById('val-risk').textContent     = riskLabel(r);
+  document.getElementById('val-creative').textContent = creativeLabel(c);
+
+  updateFill('s-time',     'fill-time');
+  updateFill('s-prob',     'fill-prob');
+  updateFill('s-aitime',   'fill-aitime');
+  updateFill('s-risk',     'fill-risk');
+  updateFill('s-creative', 'fill-creative');
+
+  const { mode, timeSaving, aiComp, safeMargin } = decide(t, p, at, r, c);
+  const m   = MODES[mode];
+  const col = colorMap[m.color];
+
+  document.getElementById('mode-tag').textContent    = m.tag;
+  document.getElementById('result-mode').textContent = m.label;
+  document.getElementById('result-mode').style.color = col.hex;
+  document.getElementById('result-desc').textContent = m.desc;
+
+  const dot = document.getElementById('mode-dot');
+  dot.style.background  = col.hex;
+  dot.style.boxShadow   = `0 0 6px ${col.hex}`;
+
+  const badge = document.getElementById('mode-badge');
+  badge.style.background  = col.hex + '18';
+  badge.style.borderColor = col.hex + '50';
+  badge.style.color       = col.hex;
+
+  document.getElementById('result-panel').className = `result-panel ${col.glow}`;
+
+  document.getElementById('mode-axis').innerHTML = m.axis.map(a => `
+    <div class="axis-cell">
+      <div class="axis-cell-label">${a.label}</div>
+      <div class="axis-cell-val">${a.val}</div>
+    </div>
+  `).join('');
+
+  document.getElementById('tips-container').innerHTML = m.tips.map(t => `
+    <div class="tip-item"><span class="tip-icon">${t.icon}</span><span>${t.text}</span></div>
+  `).join('');
+
+  const safeColor = safeMargin < 35 ? '#ff4d6d' : safeMargin < 60 ? '#f5a623' : '#39d98a';
+  document.getElementById('bar-time').style.width     = timeSaving + '%';
+  document.getElementById('sv-time').textContent      = timeSaving + '%';
+  document.getElementById('bar-ai').style.width       = aiComp + '%';
+  document.getElementById('sv-ai').textContent        = aiComp + '%';
+  document.getElementById('bar-safe').style.width     = safeMargin + '%';
+  document.getElementById('bar-safe').style.background = safeColor;
+  document.getElementById('sv-safe').textContent      = safeMargin + '%';
+}
+
+['time','prob','aitime','risk','creative'].forEach(id => {
+  makeTicks('ticks-' + id, 21);
+  document.getElementById('s-' + id).addEventListener('input', render);
+});
+
+render();
+</script>
+</body>
+</html>
