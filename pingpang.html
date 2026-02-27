@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Pong Championship</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Orbitron', sans-serif;
+            touch-action: none; /* Prevent mobile scrolling */
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.1);
+            border: 2px solid #333;
+        }
+
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            z-index: 10;
+        }
+
+        .score-board {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            font-size: 4rem;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            pointer-events: auto;
+            backdrop-filter: blur(5px);
+            transition: opacity 0.3s;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .btn {
+            background: transparent;
+            border: 2px solid #0ff;
+            color: #0ff;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-family: 'Orbitron', sans-serif;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 0 15px #0ff;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            background: #0ff;
+            color: #000;
+            box-shadow: 0 0 30px #0ff;
+        }
+
+        /* Scanline effect */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="scanlines"></div>
+
+    <div id="game-container">
+        <canvas id="pongCanvas"></canvas>
+        
+        <div class="ui-layer">
+            <div class="score-board">
+                <div id="scorePlayer">0</div>
+                <div class="text-gray-600 text-2xl mt-8">VS</div>
+                <div id="scoreAI">0</div>
+            </div>
+            <div class="text-center text-gray-500 text-sm mb-4">控制: 鼠标 / 触摸 / ↑↓ 箭头键</div>
+        </div>
+
+        <div id="startScreen" class="overlay">
+            <h1 class="text-6xl text-cyan-400 font-bold mb-4" style="text-shadow: 0 0 20px #0ff;">NEON PONG</h1>
+            <p class="text-gray-300 mb-8 text-xl">击败 AI 对手</p>
+            <button class="btn" onclick="startGame()">开始游戏</button>
+        </div>
+
+        <div id="gameOverScreen" class="overlay hidden">
+            <h1 id="winnerText" class="text-5xl text-white font-bold mb-4">GAME OVER</h1>
+            <p class="text-gray-300 mb-8 text-xl">最终比分: <span id="finalScore"></span></p>
+            <button class="btn" onclick="resetGame()">再玩一次</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration & State ---
+        const canvas = document.getElementById('pongCanvas');
+        const ctx = canvas.getContext('2d');
+        const scorePlayerEl = document.getElementById('scorePlayer');
+        const scoreAIEl = document.getElementById('scoreAI');
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const winnerText = document.getElementById('winnerText');
+        const finalScoreEl = document.getElementById('finalScore');
+
+        let gameRunning = false;
+        let animationId;
+        let particles = [];
+        
+        // Audio Context State
+        let audioInitialized = false;
+
+        // Game Settings
+        const WIN_SCORE = 5;
+        const PADDLE_WIDTH = 15;
+        const PADDLE_HEIGHT = 100;
+        const BALL_RADIUS = 8;
+        
+        // Colors
+        const COLOR_PLAYER = '#0ff'; // Cyan
+        const COLOR_AI = '#f0f';     // Magenta
+        const COLOR_BALL = '#fff';
+
+        // Game Objects
+        const ball = {
+            x: 0, y: 0,
+            speed: 7,
+            dx: 5, dy: 5,
+            radius: BALL_RADIUS,
+            trail: []
+        };
+
+        const player = {
+            x: 20,
+            y: 0,
+            width: PADDLE_WIDTH,
+            height: PADDLE_HEIGHT,
+            score: 0,
+            color: COLOR_PLAYER,
+            dy: 0
+        };
+
+        const ai = {
+            x: 0, // set in resize
+            y: 0,
+            width: PADDLE_WIDTH,
+            height: PADDLE_HEIGHT,
+            score: 0,
+            color: COLOR_AI,
+            speed: 5.5
+        };
+
+        // --- Audio System (Tone.js) ---
+        let synth, noiseSynth;
+
+        async function initAudio() {
+            if (audioInitialized) return;
+            await Tone.start();
+            
+            // Main synth for paddle hits
+            synth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "square" },
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0.0, release: 0.1 }
+            }).toDestination();
+            synth.volume.value = -10;
+
+            // Noise synth for wall hits
+            noiseSynth = new Tone.NoiseSynth({
+                noise: { type: "pink" },
+                envelope: { attack: 0.005, decay: 0.1, sustain: 0 }
+            }).toDestination();
+            noiseSynth.volume.value = -15;
+
+            audioInitialized = true;
+        }
+
+        function playSound(type) {
+            if (!audioInitialized) return;
+            try {
+                if (type === 'paddle') synth.triggerAttackRelease(["C5", "E5"], "32n");
+                if (type === 'wall') noiseSynth.triggerAttackRelease("32n");
+                if (type === 'score') synth.triggerAttackRelease(["A4", "C4"], "16n");
+                if (type === 'win') {
+                    const now = Tone.now();
+                    synth.triggerAttackRelease("C4", "8n", now);
+                    synth.triggerAttackRelease("E4", "8n", now + 0.1);
+                    synth.triggerAttackRelease("G4", "8n", now + 0.2);
+                    synth.triggerAttackRelease("C5", "2n", now + 0.3);
+                }
+            } catch(e) { console.log("Audio error", e); }
+        }
+
+        // --- Resize Handling ---
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            // Reset positions relative to new size
+            ai.x = canvas.width - 20 - PADDLE_WIDTH;
+            
+            if (!gameRunning) {
+                resetBall();
+                player.y = canvas.height / 2 - PADDLE_HEIGHT / 2;
+                ai.y = canvas.height / 2 - PADDLE_HEIGHT / 2;
+            }
+        }
+        window.addEventListener('resize', resize);
+
+        // --- Input Handling ---
+        function handleInput(clientY) {
+            if (!gameRunning) return;
+            const rect = canvas.getBoundingClientRect();
+            const relativeY = clientY - rect.top;
+            
+            // Center paddle on mouse/touch
+            player.y = relativeY - player.height / 2;
+
+            // Clamp
+            if (player.y < 0) player.y = 0;
+            if (player.y + player.height > canvas.height) player.y = canvas.height - player.height;
+        }
+
+        canvas.addEventListener('mousemove', e => handleInput(e.clientY));
+        canvas.addEventListener('touchmove', e => {
+            e.preventDefault();
+            handleInput(e.touches[0].clientY);
+        }, { passive: false });
+        
+        // Keyboard controls
+        const keys = {};
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        // --- Game Logic ---
+
+        function resetBall() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.speed = 7;
+            ball.trail = [];
+            
+            // Randomize start direction
+            const dirX = Math.random() > 0.5 ? 1 : -1;
+            const dirY = Math.random() * 2 - 1; // -1 to 1
+            
+            ball.dx = dirX * ball.speed;
+            ball.dy = dirY * ball.speed;
+        }
+
+        function createParticles(x, y, color) {
+            for (let i = 0; i < 10; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.05;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function update() {
+            if (!gameRunning) return;
+
+            // Keyboard Movement (alternative to mouse)
+            if (keys['ArrowUp']) player.y -= 8;
+            if (keys['ArrowDown']) player.y += 8;
+            
+            // Clamp player
+            if (player.y < 0) player.y = 0;
+            if (player.y + player.height > canvas.height) player.y = canvas.height - player.height;
+
+            // AI Movement
+            // Simple AI: follow ball y, but limited by speed and imperfect reaction
+            const aiCenter = ai.y + ai.height / 2;
+            if (aiCenter < ball.y - 35) {
+                ai.y += ai.speed;
+            } else if (aiCenter > ball.y + 35) {
+                ai.y -= ai.speed;
+            }
+            // Clamp AI
+            if (ai.y < 0) ai.y = 0;
+            if (ai.y + ai.height > canvas.height) ai.y = canvas.height - ai.height;
+
+            // Ball Movement
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            // Trail Logic
+            ball.trail.push({x: ball.x, y: ball.y});
+            if (ball.trail.length > 10) ball.trail.shift();
+
+            // Wall Collision (Top/Bottom)
+            if (ball.y - ball.radius < 0 || ball.y + ball.radius > canvas.height) {
+                ball.dy = -ball.dy;
+                playSound('wall');
+                // Prevent sticking
+                if(ball.y < 0) ball.y = ball.radius + 1;
+                if(ball.y > canvas.height) ball.y = canvas.height - ball.radius - 1;
+            }
+
+            // Paddle Collision Helper
+            function checkCollision(paddle) {
+                return ball.x - ball.radius < paddle.x + paddle.width &&
+                       ball.x + ball.radius > paddle.x &&
+                       ball.y + ball.radius > paddle.y &&
+                       ball.y - ball.radius < paddle.y + paddle.height;
+            }
+
+            // Player Collision
+            if (checkCollision(player)) {
+                // Calculate hit position relative to center of paddle (-1 to 1)
+                let collidePoint = ball.y - (player.y + player.height/2);
+                collidePoint = collidePoint / (player.height/2);
+                
+                // Angle calculation
+                let angleRad = (Math.PI/4) * collidePoint;
+
+                // Increase speed slightly
+                ball.speed = Math.min(ball.speed + 0.5, 18); // Max speed cap
+
+                let direction = 1; // Moving right
+                ball.dx = direction * ball.speed * Math.cos(angleRad);
+                ball.dy = ball.speed * Math.sin(angleRad);
+                
+                playSound('paddle');
+                createParticles(ball.x, ball.y, player.color);
+            }
+
+            // AI Collision
+            if (checkCollision(ai)) {
+                let collidePoint = ball.y - (ai.y + ai.height/2);
+                collidePoint = collidePoint / (ai.height/2);
+                let angleRad = (Math.PI/4) * collidePoint;
+
+                ball.speed = Math.min(ball.speed + 0.5, 18);
+
+                let direction = -1; // Moving left
+                ball.dx = direction * ball.speed * Math.cos(angleRad);
+                ball.dy = ball.speed * Math.sin(angleRad);
+
+                playSound('paddle');
+                createParticles(ball.x, ball.y, ai.color);
+            }
+
+            // Scoring
+            if (ball.x < 0) {
+                ai.score++;
+                playSound('score');
+                updateScoreboard();
+                checkWin();
+                resetBall();
+            } else if (ball.x > canvas.width) {
+                player.score++;
+                playSound('score');
+                updateScoreboard();
+                checkWin();
+                resetBall();
+            }
+
+            updateParticles();
+        }
+
+        function updateScoreboard() {
+            scorePlayerEl.innerText = player.score;
+            scoreAIEl.innerText = ai.score;
+            
+            // Visual pop effect
+            scorePlayerEl.style.transform = "scale(1.5)";
+            scoreAIEl.style.transform = "scale(1.5)";
+            setTimeout(() => {
+                scorePlayerEl.style.transform = "scale(1)";
+                scoreAIEl.style.transform = "scale(1)";
+            }, 200);
+        }
+
+        function checkWin() {
+            if (player.score >= WIN_SCORE || ai.score >= WIN_SCORE) {
+                gameRunning = false;
+                const won = player.score >= WIN_SCORE;
+                winnerText.innerText = won ? "YOU WIN!" : "GAME OVER";
+                winnerText.style.color = won ? COLOR_PLAYER : COLOR_AI;
+                finalScoreEl.innerText = `${player.score} - ${ai.score}`;
+                gameOverScreen.classList.remove('hidden');
+                if(won) playSound('win');
+            }
+        }
+
+        // --- Rendering ---
+
+        function drawRect(x, y, w, h, color, glow = false) {
+            ctx.fillStyle = color;
+            if (glow) {
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = color;
+            } else {
+                ctx.shadowBlur = 0;
+            }
+            ctx.fillRect(x, y, w, h);
+            ctx.shadowBlur = 0; // Reset
+        }
+
+        function drawCircle(x, y, r, color) {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2, false);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawNet() {
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 15]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function drawParticles() {
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+        }
+
+        function draw() {
+            // Clear background with trail effect (optional, but clean clear is better for pong)
+            ctx.fillStyle = '#050505';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawNet();
+
+            // Draw Paddles
+            drawRect(player.x, player.y, player.width, player.height, player.color, true);
+            drawRect(ai.x, ai.y, ai.width, ai.height, ai.color, true);
+
+            // Draw Ball Trail
+            for(let i=0; i<ball.trail.length; i++) {
+                let opacity = i / ball.trail.length;
+                let size = ball.radius * (i / ball.trail.length);
+                ctx.fillStyle = `rgba(255, 255, 255, ${opacity * 0.5})`;
+                ctx.beginPath();
+                ctx.arc(ball.trail[i].x, ball.trail[i].y, size, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            // Draw Ball
+            drawCircle(ball.x, ball.y, ball.radius, COLOR_BALL);
+            // Ball Glow
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "white";
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI*2);
+            ctx.fillStyle = "#fff";
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            drawParticles();
+        }
+
+        function loop() {
+            update();
+            draw();
+            animationId = requestAnimationFrame(loop);
+        }
+
+        // --- Game Control ---
+
+        async function startGame() {
+            await initAudio();
+            startScreen.classList.add('hidden');
+            resize(); // Ensure positions are correct
+            resetBall();
+            player.score = 0;
+            ai.score = 0;
+            updateScoreboard();
+            gameRunning = true;
+            loop();
+        }
+
+        function resetGame() {
+            gameOverScreen.classList.add('hidden');
+            player.score = 0;
+            ai.score = 0;
+            updateScoreboard();
+            resetBall();
+            gameRunning = true;
+        }
+
+        // Initial setup
+        resize();
+        // Draw initial static frame
+        drawNet();
+        drawRect(player.x, canvas.height/2 - 50, player.width, player.height, player.color, true);
+        drawRect(ai.x, canvas.height/2 - 50, ai.width, ai.height, ai.color, true);
+        drawCircle(canvas.width/2, canvas.height/2, ball.radius, COLOR_BALL);
+
+    </script>
+</body>
+</html>

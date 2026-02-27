@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>物理绳索模拟</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #1a1a2e;
+        }
+        canvas {
+            display: block;
+            cursor: grab;
+        }
+        canvas:active {
+            cursor: grabbing;
+        }
+        .info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            user-select: none;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div class="info">拖动绳子的右端来甩动它</div>
+    
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 设置画布大小
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // 绳索参数
+        const NODE_COUNT = 30;
+        const NODE_MASS = 1;
+        const DAMPING = 0.99;
+        const GRAVITY = 0.3;
+        const REST_LENGTH = 8;
+        const STIFFNESS = 0.8;
+        const ITERATIONS = 3;
+        
+        // 节点类
+        class Node {
+            constructor(x, y, fixed = false) {
+                this.x = x;
+                this.y = y;
+                this.oldX = x;
+                this.oldY = y;
+                this.fixed = fixed;
+                this.mass = NODE_MASS;
+                this.vx = 0;
+                this.vy = 0;
+            }
+            
+            update() {
+                if (this.fixed) return;
+                
+                // Verlet积分
+                const velX = (this.x - this.oldX) * DAMPING;
+                const velY = (this.y - this.oldY) * DAMPING;
+                
+                this.oldX = this.x;
+                this.oldY = this.y;
+                
+                this.x += velX;
+                this.y += velY + GRAVITY;
+                
+                // 边界碰撞
+                if (this.x < 5) {
+                    this.x = 5;
+                    this.oldX = this.x + velX * 0.5;
+                }
+                if (this.x > canvas.width - 5) {
+                    this.x = canvas.width - 5;
+                    this.oldX = this.x + velX * 0.5;
+                }
+                if (this.y < 5) {
+                    this.y = 5;
+                    this.oldY = this.y + velY * 0.5;
+                }
+                if (this.y > canvas.height - 5) {
+                    this.y = canvas.height - 5;
+                    this.oldY = this.y + velY * 0.5;
+                }
+            }
+            
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.fixed ? 5 : 4, 0, Math.PI * 2);
+                ctx.fillStyle = this.fixed ? '#ff6b6b' : '#4ecdc4';
+                ctx.fill();
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+        
+        // 约束类
+        class Constraint {
+            constructor(nodeA, nodeB) {
+                this.nodeA = nodeA;
+                this.nodeB = nodeB;
+                this.restLength = REST_LENGTH;
+            }
+            
+            satisfy() {
+                const dx = this.nodeB.x - this.nodeA.x;
+                const dy = this.nodeB.y - this.nodeA.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance > 0) {
+                    const difference = (this.restLength - distance) / distance;
+                    const offsetX = dx * difference * 0.5;
+                    const offsetY = dy * difference * 0.5;
+                    
+                    if (!this.nodeA.fixed) {
+                        this.nodeA.x -= offsetX * STIFFNESS;
+                        this.nodeA.y -= offsetY * STIFFNESS;
+                    }
+                    if (!this.nodeB.fixed) {
+                        this.nodeB.x += offsetX * STIFFNESS;
+                        this.nodeB.y += offsetY * STIFFNESS;
+                    }
+                }
+            }
+        }
+        
+        // 创建绳索
+        const nodes = [];
+        const constraints = [];
+        const startX = 100;
+        const startY = 100;
+        
+        for (let i = 0; i < NODE_COUNT; i++) {
+            const x = startX + i * REST_LENGTH * 0.8;
+            const y = startY;
+            const fixed = i === 0; // 只有第一个节点固定
+            nodes.push(new Node(x, y, fixed));
+        }
+        
+        for (let i = 0; i < NODE_COUNT - 1; i++) {
+            constraints.push(new Constraint(nodes[i], nodes[i + 1]));
+        }
+        
+        // 鼠标交互
+        let mouseX = 0;
+        let mouseY = 0;
+        let isDragging = false;
+        let draggedNode = null;
+        let dragOffset = { x: 0, y: 0 };
+        
+        canvas.addEventListener('mousedown', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            
+            // 检查是否点击了最后一个节点
+            const lastNode = nodes[nodes.length - 1];
+            const dx = mouseX - lastNode.x;
+            const dy = mouseY - lastNode.y;
+            if (Math.sqrt(dx * dx + dy * dy) < 20) {
+                isDragging = true;
+                draggedNode = lastNode;
+                dragOffset.x = dx;
+                dragOffset.y = dy;
+                draggedNode.fixed = true;
+            }
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+        
+        canvas.addEventListener('mouseup', () => {
+            if (isDragging && draggedNode) {
+                draggedNode.fixed = false;
+                isDragging = false;
+                draggedNode = null;
+            }
+        });
+        
+        // 动画循环
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 更新拖动的节点
+            if (isDragging && draggedNode) {
+                draggedNode.x = mouseX - dragOffset.x;
+                draggedNode.y = mouseY - dragOffset.y;
+                draggedNode.oldX = draggedNode.x;
+                draggedNode.oldY = draggedNode.y;
+            }
+            
+            // 更新节点
+            nodes.forEach(node => node.update());
+            
+            // 多次迭代约束求解
+            for (let iteration = 0; iteration < ITERATIONS; iteration++) {
+                constraints.forEach(constraint => constraint.satisfy());
+            }
+            
+            // 绘制绳索
+            ctx.beginPath();
+            ctx.moveTo(nodes[0].x, nodes[0].y);
+            
+            // 使用贝塞尔曲线和渐变实现平滑多彩的绳索效果
+            const gradient = ctx.createLinearGradient(
+                nodes[0].x, nodes[0].y,
+                nodes[nodes.length - 1].x, nodes[nodes.length - 1].y
+            );
+            
+            // 彩色渐变彩虹效果
+            gradient.addColorStop(0, '#ff6b6b');
+            gradient.addColorStop(0.17, '#feca57');
+            gradient.addColorStop(0.33, '#48dbfb');
+            gradient.addColorStop(0.5, '#ff9ff3');
+            gradient.addColorStop(0.67, '#54a0ff');
+            gradient.addColorStop(0.83, '#5f27cd');
+            gradient.addColorStop(1, '#00d2d3');
+            
+            // 绘制平滑的绳索曲线
+            for (let i = 1; i < nodes.length - 2; i++) {
+                const xc = (nodes[i].x + nodes[i + 1].x) / 2;
+                const yc = (nodes[i].y + nodes[i + 1].y) / 2;
+                ctx.quadraticCurveTo(nodes[i].x, nodes[i].y, xc, yc);
+            }
+            
+            // 绘制最后一段
+            if (nodes.length >= 2) {
+                ctx.quadraticCurveTo(
+                    nodes[nodes.length - 2].x,
+                    nodes[nodes.length - 2].y,
+                    nodes[nodes.length - 1].x,
+                    nodes[nodes.length - 1].y
+                );
+            }
+            
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+            
+            // 绘制节点（固定节点更明显）
+            nodes.forEach(node => node.draw());
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+        
+        // 开始动画
+        animate();
+    </script>
+</body>
+</html>
