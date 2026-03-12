@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Native Kanban Board</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background-color: #2c3e50;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            padding-top: 50px;
+        }
+
+        .board {
+            display: flex;
+            gap: 20px;
+            width: 90%;
+            max-width: 1200px;
+            height: 80vh;
+        }
+
+        .column {
+            flex: 1;
+            background-color: #ecf0f1;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+        }
+
+        .column-header {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .count {
+            background: #bdc3c7;
+            border-radius: 12px;
+            padding: 2px 10px;
+            font-size: 0.9rem;
+        }
+
+        .task {
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            cursor: grab;
+            border-left: 4px solid transparent;
+            transition: opacity 0.3s ease;
+        }
+
+        .task.high { border-left-color: #e74c3c; }
+        .task.medium { border-left-color: #f1c40f; }
+        .task.low { border-left-color: #2ecc71; }
+
+        .task h4 { margin: 0 0 5px 0; }
+        .task p { margin: 0; font-size: 0.9rem; }
+
+        .task.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+
+        .column.drag-over {
+            border: 2px dashed #3498db;
+            background-color: #d6eaf8;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="board">
+        <div class="column" id="todo">
+            <div class="column-header">
+                <span>To Do</span>
+                <span class="count">3</span>
+            </div>
+            <div class="task high" draggable="true">
+                <h4>Fix Login Bug</h4>
+                <p>Auth token expires too early</p>
+            </div>
+            <div class="task medium" draggable="true">
+                <h4>Update Readme</h4>
+                <p>Add installation steps</p>
+            </div>
+            <div class="task low" draggable="true">
+                <h4>Change Icon</h4>
+                <p>Update favicon assets</p>
+            </div>
+        </div>
+
+        <div class="column" id="inprogress">
+            <div class="column-header">
+                <span>In Progress</span>
+                <span class="count">1</span>
+            </div>
+            <div class="task high" draggable="true">
+                <h4>Optimize DB</h4>
+                <p>Add indexes to users table</p>
+            </div>
+        </div>
+
+        <div class="column" id="done">
+            <div class="column-header">
+                <span>Done</span>
+                <span class="count">1</span>
+            </div>
+            <div class="task low" draggable="true">
+                <h4>Design Review</h4>
+                <p>Mockups approved by client</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 获取所有任务和列
+        const tasks = document.querySelectorAll('.task');
+        const columns = document.querySelectorAll('.column');
+        let draggedTask = null;
+
+        // 为每个任务添加拖拽事件
+        tasks.forEach(task => {
+            task.addEventListener('dragstart', handleDragStart);
+            task.addEventListener('dragend', handleDragEnd);
+        });
+
+        // 为每个列添加放置区域事件
+        columns.forEach(column => {
+            column.addEventListener('dragover', handleDragOver);
+            column.addEventListener('drop', handleDrop);
+            column.addEventListener('dragenter', handleDragEnter);
+            column.addEventListener('dragleave', handleDragLeave);
+        });
+
+        function handleDragStart(e) {
+            draggedTask = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.innerHTML);
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            
+            // 清除所有高亮
+            columns.forEach(column => {
+                column.classList.remove('drag-over');
+            });
+            
+            draggedTask = null;
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+
+        function handleDragEnter(e) {
+            this.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            
+            // 移除高亮
+            this.classList.remove('drag-over');
+            
+            if (draggedTask) {
+                // 将任务移动到新列
+                this.appendChild(draggedTask);
+                
+                // 更新所有列的计数
+                updateColumnCounts();
+            }
+            
+            return false;
+        }
+
+        function updateColumnCounts() {
+            columns.forEach(column => {
+                const count = column.querySelectorAll('.task').length;
+                const countElement = column.querySelector('.count');
+                if (countElement) {
+                    countElement.textContent = count;
+                }
+            });
+        }
+    </script>
+</body>
+</html>

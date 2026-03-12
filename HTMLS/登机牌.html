@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSS Flight Ticket Challenge</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #ffffff; /* 纯白色背景 */
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #333;
+        }
+
+        /* 机票整体容器 */
+        .ticket {
+            display: flex;
+            width: 650px;
+            background-color: #fff;
+            border-radius: 20px; /* 圆角 */
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15); /* 柔和阴影 */
+            overflow: hidden; /* 确保圆角裁剪内容 */
+            position: relative;
+        }
+
+        /* 左侧主券 */
+        .ticket-main {
+            flex: 2; /* 占据2/3宽度 */
+            padding: 30px;
+            background-color: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 右侧副券 */
+        .ticket-stub {
+            flex: 1; /* 占据1/3宽度 */
+            padding: 30px;
+            background-color: #f7f7f7; /* 轻微的灰度背景 */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            border-left: 2px dashed #ddd; /* 备用虚线（如果伪元素失效） */
+        }
+
+        /* 分割线逻辑 */
+        /* 使用伪元素在主券右侧绘制一条从上到下的虚线，覆盖在两区域之上 */
+        .ticket-main::after {
+            content: "";
+            position: absolute;
+            right: -1px; /* 微调位置对准中心 */
+            top: 15px;
+            bottom: 15px;
+            border-right: 2px dashed #ccc;
+            z-index: 2;
+        }
+
+        /* 顶部和底部缺口效果 (Tear-off effect) */
+        /* 在主券和副券的边缘各放置一个圆形，颜色与背景相同（模拟白色），压住虚线 */
+        .ticket::before, .ticket::after {
+            content: "";
+            position: absolute;
+            left: 66.66%; /* 定位在分割线位置 (2/3处) */
+            width: 24px;
+            height: 24px;
+            background-color: #fff;
+            border-radius: 50%;
+            transform: translateX(-50%);
+            z-index: 3; /* 确保在最上层 */
+            box-shadow: inset 0 0 4px rgba(0,0,0,0.05);
+        }
+
+        .ticket::before {
+            top: -12px; /* 顶部缺口 */
+        }
+
+        .ticket::after {
+            bottom: -12px; /* 底部缺口 */
+        }
+
+        /* 内容样式 */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+            color: #555;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .route {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0;
+        }
+
+        .city {
+            text-align: center;
+        }
+
+        .city h2 {
+            margin: 0;
+            font-size: 2.5rem;
+            color: #2c3e50;
+            line-height: 1;
+        }
+
+        .city span {
+            font-size: 0.8rem;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .plane-icon {
+            font-size: 2rem;
+            color: #87CEEB; /* 淡蓝色飞机图标 */
+            padding: 0 20px;
+            transform: rotate(45deg);
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stub-info {
+            margin-bottom: 25px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .label {
+            font-size: 0.75rem;
+            color: #aaa; /* 浅灰色标签 */
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+
+        .value {
+            font-size: 1.1rem;
+            color: #333; /* 深色数值 */
+            font-weight: 700;
+        }
+
+        .seat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        /* 条形码生成 */
+        .barcode {
+            width: 100%;
+            height: 60px;
+            background: 
+                repeating-linear-gradient(
+                    90deg,
+                    #000 0px, 
+                    #000 2px, 
+                    transparent 2px, 
+                    transparent 4px,
+                    #000 4px,
+                    #000 5px,
+                    transparent 5px,
+                    transparent 8px,
+                    #000 8px,
+                    #000 9px,
+                    transparent 9px,
+                    transparent 12px
+                );
+            /* 上面的gradient只是为了生成随机宽度的条纹模拟真实条形码 */
+            opacity: 0.8;
+            margin-top: 10px;
+            position: relative;
+        }
+        
+        /* 条形码底部加一条线更像真的 */
+        .barcode::after {
+            content: '81520422345';
+            position: absolute;
+            bottom: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            color: #666;
+            font-family: monospace;
+            letter-spacing: 2px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- 机票容器 -->
+    <div class="ticket">
+        
+        <!-- 左侧：主要信息区 -->
+        <div class="ticket-main">
+            <div class="header">
+                <span class="airline">OCEANIC AIRLINES</span>
+                <span class="flight-no">FLIGHT 815</span>
+            </div>
+            
+            <div class="route">
+                <div class="city">
+                    <h2>SYD</h2>
+                    <span>Sydney</span>
+                </div>
+                <div class="plane-icon">✈</div>
+                <div class="city">
+                    <h2>LAX</h2>
+                    <span>Los Angeles</span>
+                </div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-item">
+                    <span class="label">DATE</span>
+                    <span class="value">22 SEP</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">TIME</span>
+                    <span class="value">10:45 AM</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">GATE</span>
+                    <span class="value">A12</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：副券/登机存根 -->
+        <div class="ticket-stub">
+            <div class="stub-info">
+                <span class="label">PASSENGER</span>
+                <span class="value">FORD/JAMES</span>
+            </div>
+            <div class="stub-info">
+                <span class="label">SEAT</span>
+                <span class="seat-value">42K</span>
+            </div>
+            <!-- 条形码区域 -->
+            <div class="barcode"></div>
+        </div>
+
+    </div>
+
+</body>
+</html>

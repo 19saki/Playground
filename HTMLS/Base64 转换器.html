@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base64 编码解码工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #e2e8f0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(2, 8, 20, 0.4);
+            overflow: hidden;
+            border: 1px solid rgba(94, 234, 212, 0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0d9488 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                linear-gradient(90deg, transparent 50%, rgba(255,255,255,0.05) 50%),
+                linear-gradient(transparent 50%, rgba(255,255,255,0.05) 50%);
+            background-size: 10px 10px;
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+            position: relative;
+        }
+
+        .mode-selector {
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(15, 23, 42, 0.5);
+            border-bottom: 1px solid rgba(94, 234, 212, 0.1);
+        }
+
+        .mode-btn {
+            padding: 12px 30px;
+            margin: 0 10px;
+            border: none;
+            background: rgba(30, 41, 59, 0.7);
+            color: #cbd5e1;
+            cursor: pointer;
+            border-radius: 25px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .mode-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(94, 234, 212, 0.2), transparent);
+            transition: 0.5s;
+        }
+
+        .mode-btn:hover::before {
+            left: 100%;
+        }
+
+        .mode-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+            background: rgba(51, 65, 85, 0.7);
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0d9488 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+        }
+
+        .content {
+            display: flex;
+            min-height: 500px;
+        }
+
+        .panel {
+            flex: 1;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: rgba(15, 23, 42, 0.3);
+        }
+
+        .panel-left {
+            border-right: 1px solid rgba(94, 234, 212, 0.1);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .panel-title {
+            font-size: 1.3em;
+            color: #e2e8f0;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .panel-title::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #0ea5e9;
+        }
+
+        .char-count {
+            font-size: 0.9em;
+            color: #94a3b8;
+            background: rgba(30, 41, 59, 0.5);
+            padding: 4px 8px;
+            border-radius: 12px;
+        }
+
+        .input-area {
+            flex: 1;
+            position: relative;
+        }
+
+        .text-input {
+            width: 100%;
+            height: 100%;
+            padding: 20px;
+            border: 1px solid rgba(94, 234, 212, 0.2);
+            border-radius: 10px;
+            font-size: 16px;
+            font-family: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+            resize: none;
+            transition: all 0.3s ease;
+            background: rgba(15, 23, 42, 0.5);
+            color: #e2e8f0;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .text-input:focus {
+            outline: none;
+            border-color: #0ea5e9;
+            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2), inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .text-input::placeholder {
+            color: #64748b;
+        }
+
+        .output-area {
+            flex: 1;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(94, 234, 212, 0.2);
+            border-radius: 10px;
+            padding: 20px;
+            font-family: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 16px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            line-height: 1.6;
+            color: #e2e8f0;
+            position: relative;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .output-placeholder {
+            color: #64748b;
+            font-style: italic;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(30, 41, 59, 0.7);
+            color: #e2e8f0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0d9488 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: rgba(30, 41, 59, 0.7);
+            color: #e2e8f0;
+            border: 1px solid rgba(94, 234, 212, 0.2);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .error-message {
+            color: #fecaca;
+            font-size: 14px;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(220, 38, 38, 0.2);
+            border-radius: 6px;
+            display: none;
+            border-left: 3px solid #ef4444;
+        }
+
+        .swap-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #0ea5e9 0%, #0d9488 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 10;
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+        }
+
+        .swap-button:hover {
+            transform: translate(-50%, -50%) rotate(180deg) scale(1.1);
+            box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4);
+        }
+
+        .swap-button svg {
+            width: 24px;
+            height: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .info-section {
+            background: rgba(15, 23, 42, 0.5);
+            padding: 20px 30px;
+            border-top: 1px solid rgba(94, 234, 212, 0.1);
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #cbd5e1;
+        }
+
+        .info-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #0ea5e9 0%, #0d9488 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            flex-shrink: 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(30, 41, 59, 0.5);
+            border-top: 3px solid #0ea5e9;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+            display: none;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .success-toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+            border-left: 4px solid #34d399;
+        }
+
+        .success-toast.show {
+            transform: translateX(0);
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                flex-direction: column;
+            }
+            
+            .panel-left {
+                border-right: none;
+                border-bottom: 1px solid rgba(94, 234, 212, 0.1);
+            }
+            
+            .swap-button {
+                position: relative;
+                transform: none;
+                margin: 20px auto;
+                left: auto;
+                top: auto;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .mode-selector {
+                flex-wrap: wrap;
+            }
+            
+            .mode-btn {
+                margin: 5px;
+            }
+        }
+
+        /* Add binary pattern to header */
+        .header::after {
+            content: '0101 0101 0101 0101 0101 0101 0101 0101';
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-family: 'Fira Code', monospace;
+            font-size: 12px;
+            color: rgba(255,255,255,0.1);
+            letter-spacing: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        /* Binary pattern animation */
+        @keyframes binary-scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-20px); }
+        }
+
+        .header::after {
+            animation: binary-scroll 10s linear infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Base64 转换器</h1>
+            <p>实时编码和解码工具</p>
+        </div>
+
+        <div class="mode-selector">
+            <button class="mode-btn active" data-mode="encode">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+                编码模式
+            </button>
+            <button class="mode-btn" data-mode="decode">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+                解码模式
+            </button>
+        </div>
+
+        <div class="content">
+            <div class="panel panel-left">
+                <div class="panel-header">
+                    <div class="panel-title" id="inputTitle">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                        <span id="inputLabel">输入文本</span>
+                    </div>
+                    <div class="char-count" id="inputCount">0 字符</div>
+                </div>
+                <div class="input-area">
+                    <textarea 
+                        class="text-input" 
+                        id="inputText" 
+                        placeholder="在此输入要编码的文本..."
+                        spellcheck="false"
+                    ></textarea>
+                    <div class="loading" id="loading"></div>
+                </div>
+                <div class="error-message" id="errorMessage"></div>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" id="clearInput">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/>
+                        </svg>
+                        清空
+                    </button>
+                    <button class="btn btn-secondary" id="pasteInput">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                        </svg>
+                        粘贴
+                    </button>
+                    <button class="btn btn-success" id="loadFile">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <path d="M12 18v-6"></path>
+                            <path d="M9 15l3-3 3 3"></path>
+                        </svg>
+                        加载文件
+                    </button>
+                    <input type="file" id="fileInput" style="display: none;" accept="*/*">
+                </div>
+            </div>
+
+            <button class="swap-button" id="swapButton" title="交换内容">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="17 1 21 5 17 9"></polyline>
+                    <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                    <polyline points="7 23 3 19 7 15"></polyline>
+                    <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                </svg>
+            </button>
+
+            <div class="panel panel-right">
+                <div class="panel-header">
+                    <div class="panel-title" id="outputTitle">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <path d="M9 15l3 3 3-3"></path>
+                        </svg>
+                        <span id="outputLabel">Base64 编码结果</span>
+                    </div>
+                    <div class="char-count" id="outputCount">0 字符</div>
+                </div>
+                <div class="output-area" id="outputArea">
+                    <span class="output-placeholder">编码结果将在此显示...</span>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" id="copyOutput">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        复制结果
+                    </button>
+                    <button class="btn btn-secondary" id="saveFile">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        保存文件
+                    </button>
+                    <button class="btn btn-warning" id="clearOutput">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/>
+                        </svg>
+                        清空
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg>
+                    </div>
+                    <div>
+                        <strong>什么是Base64？</strong><br>
+                        Base64是一种基于64个可打印字符来表示二进制数据的编码方式
+                    </div>
+                </div>
+                <div class="info-item">
+                    <div class="info-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <strong>实时转换</strong><br>
+                        输入内容会实时自动转换，无需手动操作
+                    </div>
+                </div>
+                <div class="info-item">
+                    <div class="info-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 11l3 3L22 4"></path>
+                            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <strong>安全便捷</strong><br>
+                        所有操作在本地完成，数据不会上传到服务器
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="success-toast" id="successToast"></div>
+
+    <script>
+        class Base64Converter {
+            constructor() {
+                this.currentMode = 'encode';
+                this.isConverting = false;
+                this.initElements();
+                this.bindEvents();
+                this.init();
+            }
+
+            initElements() {
+                // 模式选择按钮
+                this.modeButtons = document.querySelectorAll('.mode-btn');
+                
+                // 输入相关元素
+                this.inputText = document.getElementById('inputText');
+                this.inputCount = document.getElementById('inputCount');
+                this.inputLabel = document.getElementById('inputLabel');
+                this.inputTitle = document.getElementById('inputTitle');
+                
+                // 输出相关元素
+                this.outputArea = document.getElementById('outputArea');
+                this.outputCount = document.getElementById('outputCount');
+                this.outputLabel = document.getElementById('outputLabel');
+                this.outputTitle = document.getElementById('outputTitle');
+                
+                // 控制按钮
+                this.clearInputBtn = document.getElementById('clearInput');
+                this.pasteInputBtn = document.getElementById('pasteInput');
+                this.loadFileBtn = document.getElementById('loadFile');
+                this.fileInput = document.getElementById('fileInput');
+                this.copyOutputBtn = document.getElementById('copyOutput');
+                this.saveFileBtn = document.getElementById('saveFile');
+                this.clearOutputBtn = document.getElementById('clearOutput');
+                this.swapButton = document.getElementById('swapButton');
+                
+                // 其他元素
+                this.loading = document.getElementById('loading');
+                this.errorMessage = document.getElementById('errorMessage');
+                this.successToast = document.getElementById('successToast');
+            }
+
+            bindEvents() {
+                // 模式切换
+                this.modeButtons.forEach(btn => {
+                    btn.addEventListener('click', (e) => this.switchMode(e.target.dataset.mode));
+                });
+
+                // 输入事件
+                this.inputText.addEventListener('input', () => this.handleInput());
+                this.inputText.addEventListener('paste', () => setTimeout(() => this.handleInput(), 0));
+                
+                // 控制按钮事件
+                this.clearInputBtn.addEventListener('click', () => this.clearInput());
+                this.pasteInputBtn.addEventListener('click', () => this.pasteFromClipboard());
+                this.loadFileBtn.addEventListener('click', () => this.fileInput.click());
+                this.fileInput.addEventListener('change', (e) => this.loadFile(e));
+                this.copyOutputBtn.addEventListener('click', () => this.copyToClipboard());
+                this.saveFileBtn.addEventListener('click', () => this.saveToFile());
+                this.clearOutputBtn.addEventListener('click', () => this.clearOutput());
+                this.swapButton.addEventListener('click', () => this.swapContent());
+
+                // 键盘快捷键
+                document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
+            }
+
+            init() {
+                // 从URL参数获取初始内容
+                const urlParams = new URLSearchParams(window.location.search);
+                const content = urlParams.get('content');
+                const mode = urlParams.get('mode');
+                
+                if (mode === 'decode') {
+                    this.switchMode('decode');
+                }
+                
+                if (content) {
+                    try {
+                        const decodedContent = decodeURIComponent(atob(content));
+                        this.inputText.value = decodedContent;
+                        this.handleInput();
+                    } catch (e) {
+                        console.warn('无法从URL参数加载内容:', e);
+                    }
+                }
+                
+                // 检查剪贴板权限
+                this.checkClipboardPermission();
+            }
+
+            async checkClipboardPermission() {
+                try {
+                    const permission = await navigator.permissions.query({ name: 'clipboard-read' });
+                    if (permission.state === 'denied') {
+                        this.pasteInputBtn.style.display = 'none';
+                    }
+                } catch (e) {
+                    // 某些浏览器不支持 clipboard API
+                    this.pasteInputBtn.style.display = 'none';
+                }
+            }
+
+            switchMode(mode) {
+                this.currentMode = mode;
+                
+                // 更新按钮状态
+                this.modeButtons.forEach(btn => {
+                    if (btn.dataset.mode === mode) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+
+                // 更新界面文本
+                if (mode === 'encode') {
+                    this.inputLabel.textContent = '输入文本';
+                    this.outputLabel.textContent = 'Base64 编码结果';
+                    this.inputText.placeholder = '在此输入要编码的文本...';
+                    this.outputArea.innerHTML = '<span class="output-placeholder">编码结果将在此显示...</span>';
+                } else {
+                    this.inputLabel.textContent = 'Base64 编码';
+                    this.outputLabel.textContent = '解码结果';
+                    this.inputText.placeholder = '在此输入Base64编码...';
+                    this.outputArea.innerHTML = '<span class="output-placeholder">解码结果将在此显示...</span>';
+                }
+
+                // 清空错误信息
+                this.hideError();
+                
+                // 重新处理当前输入
+                this.handleInput();
+                
+                // 更新URL参数
+                this.updateURL();
+            }
+
+            handleInput() {
+                if (this.isConverting) return;
+                
+                const input = this.inputText.value;
+                this.updateCharCount(input);
+                
+                if (input.trim() === '') {
+                    this.clearOutput();
+                    return;
+                }
+
+                this.debounceConvert(input);
+            }
+
+            debounceConvert(input) {
+                clearTimeout(this.debounceTimer);
+                this.showLoading(true);
+                
+                this.debounceTimer = setTimeout(() => {
+                    this.convert(input);
+                }, 300);
+            }
+
+            async convert(input) {
+                if (this.isConverting) return;
+                
+                this.isConverting = true;
+                
+                try {
+                    let result;
+                    if (this.currentMode === 'encode') {
+                        // 编码模式
+                        result = await this.encodeBase64(input);
+                    } else {
+                        // 解码模式
+                        result = await this.decodeBase64(input);
+                    }
+                    
+                    this.displayResult(result);
+                    this.hideError();
+                    this.updateURL();
+                } catch (error) {
+                    this.showError(error.message);
+                    this.displayResult('');
+                } finally {
+                    this.isConverting = false;
+                    this.showLoading(false);
+                }
+            }
+
+            async encodeBase64(input) {
+                try {
+                    // 使用 TextEncoder 处理 Unicode 字符
+                    const encoder = new TextEncoder();
+                    const data = encoder.encode(input);
+                    const base64 = btoa(String.fromCharCode(...data));
+                    return base64;
+                } catch (error) {
+                    // 降级方案
+                    return btoa(unescape(encodeURIComponent(input)));
+                }
+            }
+
+            async decodeBase64(input) {
+                try {
+                    // 移除空白字符
+                    const cleanInput = input.replace(/\s/g, '');
+                    
+                    // 检查是否为有效的Base64
+                    if (!this.isValidBase64(cleanInput)) {
+                        throw new Error('无效的Base64格式');
+                    }
+                    
+                    // 解码
+                    const decoded = atob(cleanInput);
+                    
+                    // 处理 Unicode 字符
+                    try {
+                        const decoder = new TextDecoder('utf-8', { fatal: true });
+                        const bytes = new Uint8Array(decoded.split('').map(c => c.charCodeAt(0)));
+                        return decoder.decode(bytes);
+                    } catch (e) {
+                        // 降级方案
+                        return decodeURIComponent(escape(decoded));
+                    }
+                } catch (error) {
+                    throw new Error('Base64解码失败：' + error.message);
+                }
+            }
+
+            isValidBase64(str) {
+                // Base64 正则表达式
+                const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+                
+                // 检查长度
+                if (str.length % 4 !== 0) {
+                    return false;
+                }
+                
+                // 检查字符
+                if (!base64Regex.test(str)) {
+                    return false;
+                }
+                
+                return true;
+            }
+
+            displayResult(result) {
+                if (result === '') {
+                    this.outputArea.innerHTML = '<span class="output-placeholder">编码结果将在此显示...</span>';
+                    this.outputCount.textContent = '0 字符';
+                } else {
+                    this.outputArea.textContent = result;
+                    this.outputCount.textContent = `${result.length} 字符`;
+                }
+            }
+
+            updateCharCount(text) {
+                this.inputCount.textContent = `${text.length} 字符`;
+            }
+
+            showError(message) {
+                this.errorMessage.textContent = message;
+                this.errorMessage.style.display = 'block';
+            }
+
+            hideError() {
+                this.errorMessage.style.display = 'none';
+            }
+
+            showLoading(show) {
+                this.loading.style.display = show ? 'inline-block' : 'none';
+            }
+
+            clearInput() {
+                this.inputText.value = '';
+                this.handleInput();
+                this.inputText.focus();
+            }
+
+            async pasteFromClipboard() {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    this.inputText.value = text;
+                    this.handleInput();
+                    this.showToast('已从剪贴板粘贴');
+                } catch (error) {
+                    // 降级方案
+                    const textarea = document.createElement('textarea');
+                    document.body.appendChild(textarea);
+                    textarea.focus();
+                    document.execCommand('paste');
+                    const pastedText = textarea.value;
+                    document.body.removeChild(textarea);
+                    
+                    if (pastedText) {
+                        this.inputText.value = pastedText;
+                        this.handleInput();
+                        this.showToast('已从剪贴板粘贴');
+                    } else {
+                        this.showToast('无法访问剪贴板，请手动粘贴', 'error');
+                    }
+                }
+            }
+
+            async loadFile(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                try {
+                    const reader = new FileReader();
+                    
+                    reader.onload = (e) => {
+                        const content = e.target.result;
+                        this.inputText.value = content;
+                        this.handleInput();
+                        this.showToast(`已加载文件: ${file.name}`);
+                    };
+                    
+                    reader.onerror = () => {
+                        this.showToast('文件读取失败', 'error');
+                    };
+                    
+                    // 根据文件类型选择读取方式
+                    if (file.type.startsWith('image/') || file.type.startsWith('application/')) {
+                        // 对于二进制文件，显示Base64编码
+                        reader.readAsDataURL(file);
+                    } else {
+                        reader.readAsText(file);
+                    }
+                    
+                } catch (error) {
+                    this.showToast('文件加载失败: ' + error.message, 'error');
+                } finally {
+                    // 清空文件输入
+                    this.fileInput.value = '';
+                }
+            }
+
+            async copyToClipboard() {
+                const output = this.outputArea.textContent;
+                if (!output || output.includes('将在此显示')) {
+                    this.showToast('没有内容可复制', 'warning');
+                    return;
+                }
+
+                try {
+                    await navigator.clipboard.writeText(output);
+                    this.showToast('已复制到剪贴板');
+                } catch (error) {
+                    // 降级方案
+                    const textarea = document.createElement('textarea');
+                    textarea.value = output;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    this.showToast('已复制到剪贴板');
+                }
+            }
+
+            async saveToFile() {
+                const output = this.outputArea.textContent;
+                if (!output || output.includes('将在此显示')) {
+                    this.showToast('没有内容可保存', 'warning');
+                    return;
+                }
+
+                try {
+                    const blob = new Blob([output], { type: 'text/plain;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    
+                    // 生成文件名
+                    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                    const extension = this.currentMode === 'encode' ? '.txt' : '.txt';
+                    a.href = url;
+                    a.download = `base64-${this.currentMode}-${timestamp}${extension}`;
+                    
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                    this.showToast('文件已保存');
+                } catch (error) {
+                    this.showToast('保存失败: ' + error.message, 'error');
+                }
+            }
+
+            clearOutput() {
+                this.outputArea.innerHTML = '<span class="output-placeholder">编码结果将在此显示...</span>';
+                this.outputCount.textContent = '0 字符';
+            }
+
+            swapContent() {
+                const input = this.inputText.value;
+                const output = this.outputArea.textContent;
+                
+                if (!output || output.includes('将在此显示')) {
+                    this.showToast('没有可交换的内容', 'warning');
+                    return;
+                }
+
+                // 交换内容
+                this.inputText.value = output;
+                this.handleInput();
+                
+                // 显示提示
+                this.showToast('内容已交换');
+                
+                // 如果当前是解码模式，自动切换到编码模式
+                if (this.currentMode === 'decode') {
+                    this.switchMode('encode');
+                }
+            }
+
+            handleKeyboardShortcuts(event) {
+                // Ctrl/Cmd + A 全选
+                if ((event.ctrlKey || event.metaKey) && event.key === 'a') {
+                    if (document.activeElement === this.inputText) {
+                        event.preventDefault();
+                        this.inputText.select();
+                    }
+                }
+                
+                // Ctrl/Cmd + Enter 触发转换
+                if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                    event.preventDefault();
+                    this.handleInput();
+                }
+                
+                // Escape 清空输入
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    this.clearInput();
+                }
+            }
+
+            updateURL() {
+                try {
+                    const input = this.inputText.value;
+                    if (input && this.currentMode === 'encode') {
+                        const encoded = btoa(encodeURIComponent(input));
+                        const newUrl = `${window.location.pathname}?mode=encode&content=${encoded}`;
+                        history.replaceState(null, '', newUrl);
+                    } else if (input && this.currentMode === 'decode') {
+                        const encoded = btoa(encodeURIComponent(input));
+                        const newUrl = `${window.location.pathname}?mode=decode&content=${encoded}`;
+                        history.replaceState(null, '', newUrl);
+                    } else {
+                        history.replaceState(null, '', window.location.pathname);
+                    }
+                } catch (e) {
+                    // 忽略URL更新错误
+                }
+            }
+
+            showToast(message, type = 'success') {
+                this.successToast.textContent = message;
+                this.successToast.className = 'success-toast show';
+                
+                // 根据类型设置样式
+                if (type === 'error') {
+                    this.successToast.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+                    this.successToast.style.borderLeft = '4px solid #f87171';
+                } else if (type === 'warning') {
+                    this.successToast.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+                    this.successToast.style.borderLeft = '4px solid #fbbf24';
+                } else {
+                    this.successToast.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                    this.successToast.style.borderLeft = '4px solid #34d399';
+                }
+                
+                setTimeout(() => {
+                    this.successToast.classList.remove('show');
+                }, 3000);
+            }
+        }
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', () => {
+            new Base64Converter();
+        });
+
+        // 添加页面可见性API支持
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                // 页面变为可见时，检查剪贴板
+                if (navigator.clipboard && navigator.clipboard.readText) {
+                    navigator.clipboard.readText().then(text => {
+                        // 可以在这里实现自动粘贴功能
+                    }).catch(() => {});
+                }
+            }
+        });
+
+        // 添加触摸支持
+        if ('ontouchstart' in window) {
+            document.addEventListener('touchstart', function(e) {
+                // 触摸反馈
+                if (e.target.classList.contains('btn') || e.target.classList.contains('mode-btn')) {
+                    e.target.style.transform = 'scale(0.95)';
+                }
+            });
+            
+            document.addEventListener('touchend', function(e) {
+                if (e.target.classList.contains('btn') || e.target.classList.contains('mode-btn')) {
+                    setTimeout(() => {
+                        e.target.style.transform = '';
+                    }, 100);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

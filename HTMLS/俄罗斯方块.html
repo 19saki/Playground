@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON TETRIS | zai Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background-color: #050510;
+            overflow: hidden;
+            user-select: none;
+        }
+        
+        /* 霓虹文字特效 */
+        .neon-text {
+            text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 20px #0ff, 0 0 30px #0ff, 0 0 40px #0ff;
+        }
+        
+        .neon-box {
+            box-shadow: 0 0 10px #0ff, inset 0 0 10px #0ff;
+            border: 1px solid #0ff;
+        }
+
+        /* 游戏画布容器 */
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.1);
+        }
+
+        /* 扫描线背景效果 */
+        .scanlines {
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2)
+            );
+            background-size: 100% 4px;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* 按钮悬停动画 */
+        .btn-hover {
+            transition: all 0.2s;
+        }
+        .btn-hover:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex items-center justify-center text-white">
+
+    <!-- 背景装饰 -->
+    <div class="absolute inset-0 z-0 opacity-20 pointer-events-none" 
+         style="background-image: radial-gradient(#4a4a8a 1px, transparent 1px); background-size: 30px 30px;">
+    </div>
+
+    <div class="relative z-10 flex gap-8 items-start">
+        
+        <!-- 左侧信息栏 -->
+        <div class="flex flex-col gap-6 w-48">
+            <div class="neon-box p-4 bg-black/60 backdrop-blur-sm rounded-lg text-center">
+                <h3 class="text-cyan-400 text-sm tracking-widest mb-2">NEXT</h3>
+                <canvas id="next-canvas" width="100" height="100" class="mx-auto bg-black/40"></canvas>
+            </div>
+            
+            <div class="neon-box p-4 bg-black/60 backdrop-blur-sm rounded-lg">
+                <div class="mb-4">
+                    <h3 class="text-cyan-400 text-xs tracking-widest">SCORE</h3>
+                    <div id="score" class="text-2xl font-bold text-white text-shadow">0</div>
+                </div>
+                <div class="mb-4">
+                    <h3 class="text-cyan-400 text-xs tracking-widest">LEVEL</h3>
+                    <div id="level" class="text-xl font-bold text-white">1</div>
+                </div>
+                <div>
+                    <h3 class="text-cyan-400 text-xs tracking-widest">LINES</h3>
+                    <div id="lines" class="text-xl font-bold text-white">0</div>
+                </div>
+            </div>
+
+            <div class="text-xs text-gray-500 text-center leading-relaxed">
+                <p>← → 移动</p>
+                <p>↑ 旋转</p>
+                <p>↓ 软着陆</p>
+                <p>空格 硬着陆</p>
+                <p>P 暂停</p>
+            </div>
+        </div>
+
+        <!-- 主游戏区 -->
+        <div id="game-container" class="relative border-4 border-gray-800 rounded-md bg-black">
+            <canvas id="game-canvas" width="300" height="600"></canvas>
+            <div class="scanlines"></div>
+
+            <!-- 遮罩层：开始/暂停/结束 -->
+            <div id="overlay" class="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-20 backdrop-blur-sm">
+                <h1 class="text-5xl font-black mb-2 italic neon-text tracking-tighter">TETRIS</h1>
+                <p class="text-cyan-300 mb-8 tracking-widest text-sm">SYSTEM READY</p>
+                <button id="start-btn" class="px-8 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded shadow-[0_0_15px_#0891b2] btn-hover transition-colors">
+                    START GAME
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /**
+         * 游戏配置与常量
+         */
+        const COLS = 10;
+        const ROWS = 20;
+        const BLOCK_SIZE = 30;
+        const COLORS = [
+            null,
+            '#FF0D72', // T - Magenta
+            '#0DC2FF', // O - Cyan
+            '#0DFF72', // S - Green
+            '#F538FF', // Z - Purple
+            '#FF8E0D', // L - Orange
+            '#FFE138', // J - Yellow
+            '#3877FF', // I - Blue
+        ];
+
+        // 方块形状定义
+        const PIECES = [
+            [],
+            [[0, 1, 0], [1, 1, 1], [0, 0, 0]], // T
+            [[2, 2], [2, 2]],                   // O
+            [[0, 3, 3], [3, 3, 0], [0, 0, 0]], // S
+            [[4, 4, 0], [0, 4, 4], [0, 0, 0]], // Z
+            [[0, 0, 5], [5, 5, 5], [0, 0, 0]], // L
+            [[6, 0, 0], [6, 6, 6], [0, 0, 0]], // J
+            [[0, 0, 0, 0], [7, 7, 7, 7], [0, 0, 0, 0], [0, 0, 0, 0]] // I
+        ];
+
+        // 音频上下文
+        let audioCtx = null;
+
+        /**
+         * 游戏状态管理
+         */
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const nextCanvas = document.getElementById('next-canvas');
+        const nextCtx = nextCanvas.getContext('2d');
+
+        let grid = createGrid(COLS, ROWS);
+        let piece = null;
+        let nextPieceType = null;
+        let score = 0;
+        let lines = 0;
+        let level = 1;
+        let dropCounter = 0;
+        let dropInterval = 1000;
+        let lastTime = 0;
+        let isPaused = false;
+        let isGameOver = false;
+        let particles = []; // 粒子数组
+
+        /**
+         * 初始化与辅助函数
+         */
+        function createGrid(w, h) {
+            return Array.from({ length: h }, () => Array(w).fill(0));
+        }
+
+        function createPiece(type) {
+            if (!type) type = (Math.random() * 7 | 0) + 1;
+            return {
+                matrix: PIECES[type],
+                pos: { x: (COLS / 2 | 0) - (PIECES[type][0].length / 2 | 0), y: 0 },
+                type: type
+            };
+        }
+
+        // 简单的音频合成器
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'move') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'rotate') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'drop') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'clear') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'gameover') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 1);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 1);
+            }
+        }
+
+        // 粒子系统类
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 4;
+                this.vy = (Math.random() - 0.5) * 4;
+                this.life = 1.0;
+                this.color = color;
+                this.size = Math.random() * 4 + 2;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= 0.02;
+                this.size *= 0.95;
+            }
+            draw(ctx) {
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        function spawnParticles(y, color) {
+            for (let i = 0; i < 10; i++) {
+                // 将网格坐标转换为像素坐标
+                const px = Math.random() * COLS * BLOCK_SIZE;
+                const py = y * BLOCK_SIZE + BLOCK_SIZE / 2;
+                particles.push(new Particle(px, py, color));
+            }
+        }
+
+        /**
+         * 核心游戏逻辑
+         */
+        function collide(arena, player) {
+            const [m, o] = [player.matrix, player.pos];
+            for (let y = 0; y < m.length; ++y) {
+                for (let x = 0; x < m[y].length; ++x) {
+                    if (m[y][x] !== 0 &&
+                        (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function drawMatrix(matrix, offset, context = ctx, isGhost = false) {
+            matrix.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        const color = COLORS[value];
+                        
+                        // 绘制方块
+                        context.fillStyle = isGhost ? `${color}40` : color; // 幽灵方块半透明
+                        
+                        // 霓虹发光效果
+                        if (!isGhost) {
+                            context.shadowColor = color;
+                            context.shadowBlur = 10;
+                        } else {
+                            context.shadowBlur = 0;
+                        }
+
+                        // 绘制主体
+                        context.fillRect((x + offset.x) * BLOCK_SIZE, (y + offset.y) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+
+                        // 绘制边框高光，增加立体感
+                        context.shadowBlur = 0;
+                        context.lineWidth = 2;
+                        context.strokeStyle = 'rgba(255,255,255,0.5)';
+                        context.strokeRect((x + offset.x) * BLOCK_SIZE, (y + offset.y) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                        
+                        // 内部高光
+                        context.fillStyle = 'rgba(255,255,255,0.2)';
+                        context.fillRect((x + offset.x) * BLOCK_SIZE + 2, (y + offset.y) * BLOCK_SIZE + 2, BLOCK_SIZE - 4, 4);
+                    }
+                });
+            });
+            context.shadowBlur = 0; // 重置
+        }
+
+        function drawGhost() {
+            if (!piece) return;
+            const ghost = {
+                matrix: piece.matrix,
+                pos: { ...piece.pos },
+                type: piece.type
+            };
+            
+            // 将幽灵方块下移到底部
+            while (!collide(grid, ghost)) {
+                ghost.pos.y++;
+            }
+            ghost.pos.y--; // 回退一步，因为collide检测到时已经重叠
+
+            drawMatrix(ghost.matrix, ghost.pos, ctx, true);
+        }
+
+        function merge(arena, player) {
+            player.matrix.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        arena[y + player.pos.y][x + player.pos.x] = value;
+                    }
+                });
+            });
+        }
+
+        function rotate(matrix, dir) {
+            for (let y = 0; y < matrix.length; ++y) {
+                for (let x = 0; x < y; ++x) {
+                    [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
+                }
+            }
+            if (dir > 0) {
+                matrix.forEach(row => row.reverse());
+            } else {
+                matrix.reverse();
+            }
+        }
+
+        function playerDrop() {
+            piece.pos.y++;
+            if (collide(grid, piece)) {
+                piece.pos.y--;
+                merge(grid, piece);
+                playSound('drop');
+                arenaSweep();
+                updateScore();
+                playerReset();
+            }
+            dropCounter = 0;
+        }
+
+        function playerMove(dir) {
+            piece.pos.x += dir;
+            if (collide(grid, piece)) {
+                piece.pos.x -= dir;
+            } else {
+                playSound('move');
+            }
+        }
+
+        function playerRotate(dir) {
+            const pos = piece.pos.x;
+            let offset = 1;
+            rotate(piece.matrix, dir);
+            // 墙踢逻辑
+            while (collide(grid, piece)) {
+                piece.pos.x += offset;
+                offset = -(offset + (offset > 0 ? 1 : -1));
+                if (offset > piece.matrix[0].length) {
+                    rotate(piece.matrix, -dir);
+                    piece.pos.x = pos;
+                    return;
+                }
+            }
+            playSound('rotate');
+        }
+
+        function playerReset() {
+            if (nextPieceType === null) nextPieceType = (Math.random() * 7 | 0) + 1;
+            
+            piece = createPiece(nextPieceType);
+            nextPieceType = (Math.random() * 7 | 0) + 1;
+            drawNextPiece();
+
+            if (collide(grid, piece)) {
+                isGameOver = true;
+                playSound('gameover');
+                document.getElementById('overlay').style.display = 'flex';
+                document.getElementById('overlay').innerHTML = `
+                    <h1 class="text-5xl font-black mb-2 text-red-500 italic tracking-tighter" style="text-shadow: 0 0 20px red">GAME OVER</h1>
+                    <p class="text-white mb-8 tracking-widest">FINAL SCORE: ${score}</p>
+                    <button id="restart-btn" class="px-8 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded shadow-[0_0_15px_#0891b2] btn-hover transition-colors">
+                        TRY AGAIN
+                    </button>
+                `;
+                document.getElementById('restart-btn').addEventListener('click', startGame);
+            }
+        }
+
+        function arenaSweep() {
+            let rowCount = 0;
+            outer: for (let y = grid.length - 1; y > 0; --y) {
+                for (let x = 0; x < grid[y].length; ++x) {
+                    if (grid[y][x] === 0) {
+                        continue outer;
+                    }
+                }
+
+                const row = grid.splice(y, 1)[0];
+                // 生成粒子效果
+                spawnParticles(y, COLORS[Math.random()*7|0+1]);
+                
+                grid.unshift(new Array(COLS).fill(0));
+                ++y;
+                rowCount++;
+            }
+            
+            if (rowCount > 0) {
+                playSound('clear');
+                // 经典计分规则
+                const lineScores = [0, 40, 100, 300, 1200];
+                score += lineScores[rowCount] * level;
+                lines += rowCount;
+                level = Math.floor(lines / 10) + 1;
+                // 速度随等级增加
+                dropInterval = Math.max(100, 1000 - (level - 1) * 100);
+            }
+        }
+
+        function updateScore() {
+            document.getElementById('score').innerText = score;
+            document.getElementById('level').innerText = level;
+            document.getElementById('lines').innerText = lines;
+        }
+
+        function drawNextPiece() {
+            nextCtx.fillStyle = 'black';
+            nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+            
+            // 居中计算
+            const matrix = PIECES[nextPieceType];
+            const boxSize = 20;
+            const offsetX = (nextCanvas.width - matrix[0].length * boxSize) / 2;
+            const offsetY = (nextCanvas.height - matrix.length * boxSize) / 2;
+
+            matrix.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        const color = COLORS[value];
+                        nextCtx.fillStyle = color;
+                        nextCtx.shadowColor = color;
+                        nextCtx.shadowBlur = 5;
+                        nextCtx.fillRect(offsetX + x * boxSize, offsetY + y * boxSize, boxSize, boxSize);
+                        nextCtx.shadowBlur = 0;
+                    }
+                });
+            });
+        }
+
+        function update(time = 0) {
+            if (isPaused || isGameOver) return;
+
+            const deltaTime = time - lastTime;
+            lastTime = time;
+
+            dropCounter += deltaTime;
+            if (dropCounter > dropInterval) {
+                playerDrop();
+            }
+
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        function draw() {
+            // 清除画布
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制网格线 (增加复古感)
+            ctx.strokeStyle = '#111';
+            ctx.lineWidth = 1;
+            for(let i=0; i<=COLS; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i*BLOCK_SIZE, 0);
+                ctx.lineTo(i*BLOCK_SIZE, canvas.height);
+                ctx.stroke();
+            }
+            for(let i=0; i<=ROWS; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, i*BLOCK_SIZE);
+                ctx.lineTo(canvas.width, i*BLOCK_SIZE);
+                ctx.stroke();
+            }
+
+            // 绘制已固定的方块
+            drawMatrix(grid, {x: 0, y: 0});
+
+            // 绘制幽灵方块
+            drawGhost();
+
+            // 绘制当前方块
+            drawMatrix(piece.matrix, piece.pos);
+
+            // 绘制并更新粒子
+            particles.forEach((p, index) => {
+                p.update();
+                p.draw(ctx);
+                if (p.life <= 0) {
+                    particles.splice(index, 1);
+                }
+            });
+        }
+
+        /**
+         * 游戏控制与事件
+         */
+        function startGame() {
+            // 初始化音频上下文 (必须在用户交互后)
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            } else if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            grid = createGrid(COLS, ROWS);
+            score = 0;
+            lines = 0;
+            level = 1;
+            dropInterval = 1000;
+            isGameOver = false;
+            isPaused = false;
+            nextPieceType = null;
+            updateScore();
+            playerReset();
+            document.getElementById('overlay').style.display = 'none';
+            update();
+        }
+
+        document.getElementById('start-btn').addEventListener('click', startGame);
+
+        document.addEventListener('keydown', event => {
+            if (isGameOver) return;
+
+            if (event.keyCode === 37) { // Left
+                playerMove(-1);
+            } else if (event.keyCode === 39) { // Right
+                playerMove(1);
+            } else if (event.keyCode === 40) { // Down
+                playerDrop();
+            } else if (event.keyCode === 38) { // Up (Rotate)
+                playerRotate(1);
+            } else if (event.keyCode === 32) { // Space (Hard Drop)
+                while (!collide(grid, piece)) {
+                    piece.pos.y++;
+                }
+                piece.pos.y--; // 回退一格
+                playSound('drop');
+                merge(grid, piece);
+                arenaSweep();
+                updateScore();
+                playerReset();
+                dropCounter = 0;
+            } else if (event.keyCode === 80) { // P (Pause)
+                if (isPaused) {
+                    isPaused = false;
+                    lastTime = performance.now(); // 防止暂停后时间跳变导致瞬间下落
+                    update();
+                    document.getElementById('overlay').style.display = 'none';
+                } else {
+                    isPaused = true;
+                    document.getElementById('overlay').style.display = 'flex';
+                    document.getElementById('overlay').innerHTML = `
+                        <h1 class="text-5xl font-black mb-8 text-yellow-400 tracking-tighter" style="text-shadow: 0 0 20px yellow">PAUSED</h1>
+                        <button id="resume-btn" class="px-8 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded shadow-[0_0_15px_#0891b2] btn-hover transition-colors">
+                            RESUME
+                        </button>
+                    `;
+                    document.getElementById('resume-btn').addEventListener('click', () => {
+                        // 触发按键事件模拟取消暂停
+                        const event = new KeyboardEvent('keydown', { keyCode: 80 });
+                        document.dispatchEvent(event);
+                    });
+                }
+            }
+        });
+
+        // 初始渲染
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    </script>
+</body>
+</html>

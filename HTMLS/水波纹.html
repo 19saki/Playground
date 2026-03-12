@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>水波纹特效</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            min-height: 100vh;
+            background-color: #f5f7fa; /* 浅灰背景突出波纹 */
+            position: relative;
+            overflow-x: hidden;
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+        .tip {
+            font-size: 18px;
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(76, 175, 247, 0.5); /* 半透明蓝色波纹 */
+            pointer-events: none; /* 点击穿透，不干扰后续点击 */
+            animation: ripple-animation 0.8s ease-out forwards;
+            transform-origin: center;
+        }
+        @keyframes ripple-animation {
+            0% {
+                transform: scale(0);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(5); /* 放大5倍扩散 */
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="tip">点击页面任意位置查看水波纹效果</div>
+    <script>
+        // 给body添加点击事件监听
+        document.body.addEventListener('click', (event) => {
+            // 创建波纹元素
+            const ripple = document.createElement('div');
+            const { clientX: x, clientY: y } = event;
+            
+            // 设置波纹初始位置（中心对齐点击点）
+            ripple.style.left = `${x - 15}px`;
+            ripple.style.top = `${y - 15}px`;
+            ripple.style.width = '30px';
+            ripple.style.height = '30px';
+            
+            // 添加波纹样式类
+            ripple.classList.add('ripple');
+            document.body.appendChild(ripple);
+            
+            // 动画结束后移除波纹元素，避免DOM堆积
+            ripple.addEventListener('animationend', () => {
+                ripple.remove();
+            });
+        });
+    </script>
+</body>
+</html>

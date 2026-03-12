@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toast Notification System</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #f4f7f6;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow-x: hidden;
+        }
+
+        .control-panel {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 { margin-top: 0; color: #333; }
+        p { color: #666; margin-bottom: 30px; }
+
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, opacity 0.2s;
+            color: white;
+        }
+
+        button:hover { opacity: 0.9; transform: translateY(-2px); }
+        button:active { transform: translateY(0); }
+
+        .btn-success { background-color: #2ecc71; }
+        .btn-info { background-color: #3498db; }
+        .btn-warning { background-color: #f1c40f; color: #333; }
+        .btn-error { background-color: #e74c3c; }
+
+        /* Toast容器样式 */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 12px;
+            width: 320px;
+            max-width: calc(100vw - 40px);
+        }
+
+        /* Toast元素基本样式 */
+        .toast {
+            position: relative;
+            background-color: white;
+            border-radius: 8px;
+            padding: 16px 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: flex-start;
+            width: 100%;
+            box-sizing: border-box;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+            pointer-events: auto;
+            overflow: hidden;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .toast.hide {
+            opacity: 0;
+            transform: translateX(100%);
+            transition: transform 0.3s ease-in, opacity 0.3s ease-in;
+        }
+
+        /* Toast类型样式 */
+        .toast-success {
+            border-left: 4px solid #2ecc71;
+        }
+
+        .toast-info {
+            border-left: 4px solid #3498db;
+        }
+
+        .toast-warning {
+            border-left: 4px solid #f1c40f;
+        }
+
+        .toast-error {
+            border-left: 4px solid #e74c3c;
+        }
+
+        /* Toast图标样式 */
+        .toast-icon {
+            font-size: 20px;
+            margin-right: 12px;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .toast-success .toast-icon {
+            color: #2ecc71;
+        }
+
+        .toast-info .toast-icon {
+            color: #3498db;
+        }
+
+        .toast-warning .toast-icon {
+            color: #f1c40f;
+        }
+
+        .toast-error .toast-icon {
+            color: #e74c3c;
+        }
+
+        /* Toast内容样式 */
+        .toast-content {
+            flex-grow: 1;
+            font-size: 14px;
+            line-height: 1.4;
+            color: #333;
+        }
+
+        /* 关闭按钮样式 */
+        .toast-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: #aaa;
+            cursor: pointer;
+            padding: 0;
+            margin-left: 12px;
+            line-height: 1;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: color 0.2s;
+        }
+
+        .toast-close:hover {
+            color: #666;
+        }
+
+        /* 进度条样式 */
+        .toast-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background-color: rgba(0, 0, 0, 0.1);
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .toast-progress-bar {
+            height: 100%;
+            transition: width 0.1s linear;
+        }
+
+        .toast-success .toast-progress-bar {
+            background-color: #2ecc71;
+        }
+
+        .toast-info .toast-progress-bar {
+            background-color: #3498db;
+        }
+
+        .toast-warning .toast-progress-bar {
+            background-color: #f1c40f;
+        }
+
+        .toast-error .toast-progress-bar {
+            background-color: #e74c3c;
+        }
+
+        /* 批量控制按钮 */
+        .batch-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .batch-controls button {
+            padding: 8px 16px;
+            font-size: 14px;
+            background-color: #7f8c8d;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .btn-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .toast-container {
+                width: 280px;
+                right: 10px;
+                top: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="control-panel">
+        <h1>消息通知触发器</h1>
+        <p>点击按钮来触发 toast 消息</p>
+        <div class="btn-group">
+            <button class="btn-success" onclick="showToast('success', 'XX任务已成功完成！')">Success</button>
+            <button class="btn-info" onclick="showToast('info', '有XX项可进行更新')">Info</button>
+            <button class="btn-warning" onclick="showToast('warning', 'XX任务受阻，请检查网络连接')">Warning</button>
+            <button class="btn-error" onclick="showToast('error', 'XX任务出错并中断，请检查日志信息')">Error</button>
+        </div>
+        
+        <div class="batch-controls">
+            <button onclick="showMultipleToasts()">批量显示通知</button>
+            <button onclick="clearAllToasts()">清除所有通知</button>
+        </div>
+    </div>
+    
+    <!-- Toast容器 -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        // Toast图标配置
+        const icons = {
+            success: '✔',
+            info: 'ℹ',
+            warning: '⚠',
+            error: '✖'
+        };
+
+        // 存储所有toast实例
+        const toastInstances = [];
+
+        // 显示Toast函数
+        function showToast(type, message) {
+            // 创建toast元素
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            
+            // 生成唯一ID
+            const toastId = 'toast-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            toast.id = toastId;
+            
+            // 设置toast内容
+            toast.innerHTML = `
+                <div class="toast-icon">${icons[type]}</div>
+                <div class="toast-content">${message}</div>
+                <button class="toast-close" aria-label="关闭">×</button>
+                <div class="toast-progress">
+                    <div class="toast-progress-bar" style="width: 100%"></div>
+                </div>
+            `;
+            
+            // 添加到容器
+            const container = document.getElementById('toast-container');
+            container.appendChild(toast);
+            
+            // 触发滑入动画
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+            
+            // 获取进度条元素
+            const progressBar = toast.querySelector('.toast-progress-bar');
+            
+            // 设置自动关闭计时器
+            const duration = 3000; // 3秒
+            let startTime = Date.now();
+            let timeoutId;
+            
+            // 更新进度条函数
+            function updateProgress() {
+                const elapsed = Date.now() - startTime;
+                const remaining = Math.max(0, duration - elapsed);
+                const widthPercentage = (remaining / duration) * 100;
+                progressBar.style.width = `${widthPercentage}%`;
+                
+                if (remaining > 0) {
+                    requestAnimationFrame(updateProgress);
+                }
+            }
+            
+            // 启动进度条动画
+            requestAnimationFrame(updateProgress);
+            
+            // 设置自动关闭
+            timeoutId = setTimeout(() => {
+                removeToast(toastId);
+            }, duration);
+            
+            // 关闭按钮点击事件
+            const closeBtn = toast.querySelector('.toast-close');
+            closeBtn.addEventListener('click', () => {
+                clearTimeout(timeoutId);
+                removeToast(toastId);
+            });
+            
+            // 存储toast实例信息
+            toastInstances.push({
+                id: toastId,
+                element: toast,
+                timeoutId: timeoutId,
+                type: type,
+                message: message
+            });
+            
+            // 限制最大显示数量
+            const maxToasts = 5;
+            if (toastInstances.length > maxToasts) {
+                // 移除最旧的toast
+                const oldestToast = toastInstances.shift();
+                clearTimeout(oldestToast.timeoutId);
+                removeToast(oldestToast.id);
+            }
+            
+            return toastId;
+        }
+        
+        // 移除Toast函数
+        function removeToast(toastId) {
+            const toastIndex = toastInstances.findIndex(t => t.id === toastId);
+            if (toastIndex === -1) return;
+            
+            const toast = document.getElementById(toastId);
+            if (!toast) return;
+            
+            // 触发滑出动画
+            toast.classList.remove('show');
+            toast.classList.add('hide');
+            
+            // 等待动画完成后移除元素
+            setTimeout(() => {
+                toast.remove();
+                
+                // 从实例数组中移除
+                const instanceIndex = toastInstances.findIndex(t => t.id === toastId);
+                if (instanceIndex !== -1) {
+                    toastInstances.splice(instanceIndex, 1);
+                }
+            }, 300); // 与CSS动画时间匹配
+        }
+        
+        // 批量显示Toast示例
+        function showMultipleToasts() {
+            const messages = [
+                { type: 'success', message: '第一个任务成功完成！' },
+                { type: 'info', message: '系统将在5分钟后进行维护' },
+                { type: 'warning', message: '您的存储空间不足，请及时清理' },
+                { type: 'error', message: '登录失败，请检查用户名和密码' },
+                { type: 'success', message: '数据备份完成' },
+                { type: 'info', message: '新版本可用，点击查看详情' }
+            ];
+            
+            // 依次显示，每个间隔500ms
+            messages.forEach((msg, index) => {
+                setTimeout(() => {
+                    showToast(msg.type, msg.message);
+                }, index * 500);
+            });
+        }
+        
+        // 清除所有Toast
+        function clearAllToasts() {
+            // 复制数组以避免迭代过程中修改
+            const toastsToRemove = [...toastInstances];
+            
+            // 清除所有定时器
+            toastsToRemove.forEach(toast => {
+                clearTimeout(toast.timeoutId);
+            });
+            
+            // 依次移除所有toast
+            toastsToRemove.forEach((toast, index) => {
+                setTimeout(() => {
+                    removeToast(toast.id);
+                }, index * 100); // 稍微错开移除时间
+            });
+        }
+        
+        // 页面加载后显示一个欢迎toast
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                showToast('info', '欢迎使用Toast通知系统！点击按钮测试不同通知类型。');
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

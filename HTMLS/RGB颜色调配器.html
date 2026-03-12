@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RGB颜色调配器</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Arial', sans-serif;
+            transition: background-color 0.3s ease;
+            padding: 20px;
+        }
+
+        .color-picker-container {
+            max-width: 500px;
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .slider-group {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        label {
+            width: 50px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            min-width: 200px;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.3s ease;
+        }
+
+        .slider-value {
+            width: 50px;
+            text-align: right;
+            font-family: monospace;
+            font-size: 1.1em;
+            color: #555;
+        }
+
+        .color-display {
+            margin-top: 30px;
+            text-align: center;
+            padding: 15px;
+            background-color: rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+        }
+
+        #hex-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #222;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        #rgb-value {
+            font-size: 1.1em;
+            color: #666;
+        }
+
+        @media (max-width: 480px) {
+            .slider-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            label, .slider-value {
+                text-align: center;
+                width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="color-picker-container">
+        <div class="slider-group">
+            <label for="r-slider">R:</label>
+            <input type="range" id="r-slider" min="0" max="255" value="128">
+            <span class="slider-value" id="r-value">128</span>
+        </div>
+
+        <div class="slider-group">
+            <label for="g-slider">G:</label>
+            <input type="range" id="g-slider" min="0" max="255" value="128">
+            <span class="slider-value" id="g-value">128</span>
+        </div>
+
+        <div class="slider-group">
+            <label for="b-slider">B:</label>
+            <input type="range" id="b-slider" min="0" max="255" value="128">
+            <span class="slider-value" id="b-value">128</span>
+        </div>
+
+        <div class="color-display">
+            <div id="hex-value">#808080</div>
+            <div id="rgb-value">RGB(128, 128, 128)</div>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const rSlider = document.getElementById('r-slider');
+        const gSlider = document.getElementById('g-slider');
+        const bSlider = document.getElementById('b-slider');
+        
+        const rValue = document.getElementById('r-value');
+        const gValue = document.getElementById('g-value');
+        const bValue = document.getElementById('b-value');
+        
+        const hexValue = document.getElementById('hex-value');
+        const rgbValue = document.getElementById('rgb-value');
+
+        // 分量转十六进制
+        function componentToHex(c) {
+            const hex = c.toString(16);
+            return hex.length === 1 ? "0" + hex : hex;
+        }
+
+        // 更新颜色显示
+        function updateColor() {
+            const r = parseInt(rSlider.value);
+            const g = parseInt(gSlider.value);
+            const b = parseInt(bSlider.value);
+
+            // 更新数值显示
+            rValue.textContent = r;
+            gValue.textContent = g;
+            bValue.textContent = b;
+
+            // 计算Hex颜色值
+            const hex = "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+            // 计算RGB颜色值
+            const rgb = `RGB(${r}, ${g}, ${b})`;
+
+            // 更新显示
+            hexValue.textContent = hex;
+            rgbValue.textContent = rgb;
+
+            // 更新背景色
+            document.body.style.backgroundColor = rgb;
+
+            // 更新滑块拇指颜色
+            rSlider.style.setProperty('--thumb-color', `rgb(${r}, 0, 0)`);
+            gSlider.style.setProperty('--thumb-color', `rgb(0, ${g}, 0)`);
+            bSlider.style.setProperty('--thumb-color', `rgb(0, 0, ${b})`);
+        }
+
+        // 绑定滑块事件
+        rSlider.addEventListener('input', updateColor);
+        gSlider.addEventListener('input', updateColor);
+        bSlider.addEventListener('input', updateColor);
+
+        // 初始加载时更新颜色
+        window.addEventListener('load', updateColor);
+    </script>
+</body>
+</html>

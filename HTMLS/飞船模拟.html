@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>无限滚动太空 - 飞船模拟</title>
+    <style>
+        /* 基础页面设置：全黑背景，无滚动条 */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /* 画布全屏 */
+        canvas {
+            display: block;
+        }
+
+        /* 驾驶舱覆盖层 (UI层) */
+        #cockpit {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* 让鼠标事件穿透到画布 */
+            box-sizing: border-box;
+            /* 简单的舷窗遮罩效果 */
+            background: radial-gradient(circle at center, transparent 50%, rgba(0, 0, 0, 0.6) 80%, rgba(0, 0, 0, 1) 100%);
+            border: 20px solid rgba(10, 20, 30, 0.8);
+            border-radius: 40px;
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+        }
+
+        /* 仪表盘/HUD */
+        .hud {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #0ff;
+            text-align: center;
+            text-shadow: 0 0 5px #0ff;
+            opacity: 0.8;
+        }
+
+        .hud h1 {
+            font-size: 16px;
+            margin: 0 0 5px 0;
+            letter-spacing: 2px;
+        }
+
+        .hud .speed-bar {
+            width: 300px;
+            height: 10px;
+            border: 1px solid #0ff;
+            padding: 2px;
+            background: rgba(0, 255, 255, 0.1);
+        }
+
+        .hud .speed-fill {
+            height: 100%;
+            background: #0ff;
+            width: 80%; /* 初始速度 */
+            transition: width 0.2s;
+        }
+
+        /* 控制提示 */
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 背景画布 -->
+    <canvas id="space"></canvas>
+
+    <!-- 前景：驾驶舱和UI -->
+    <div id="cockpit">
+        <div class="controls">
+            [鼠标上下移动] 控制速度<br>
+            [鼠标左右移动] 控制方向偏移
+        </div>
+        <div class="hud">
+            <h1>USS MINIMAX // NAVIGATING</h1>
+            <div class="speed-bar">
+                <div class="speed-fill" id="speedBar"></div>
+            </div>
+            <div style="margin-top:5px; font-size:12px;" id="speedText">WARP 4.5</div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * 核心逻辑：
+         * 使用 3D 坐标系 (x, y, z) 来模拟深度。
+         * z 轴代表距离。星星从远处 (z = max) 向近处 (z = 0) 移动。
+         * 当星星到达近处或飞出屏幕后，重置到远处。
+         */
+        
+        const canvas = document.getElementById('space');
+        const ctx = canvas.getContext('2d');
+        const speedBar = document.getElementById('speedBar');
+        const speedText = document.getElementById('speedText');
+
+        let width, height;
+        let cx, cy;
+        
+        // 配置参数
+        const STAR_COUNT = 800; // 星星数量
+        let speed = 15; // 初始速度
+        let baseSpeed = 15;
+        let rotX = 0; // 鼠标带来的X轴旋转偏移
+        let rotY = 0; // 鼠标带来的Y轴旋转偏移
+
+        // 存储星星的数组
+        const stars = [];
+
+        // 初始化画布尺寸
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            cx = width / 2;
+            cy = height / 2;
+        }
+
+        // 星星类
+        class Star {
+            constructor() {
+                this.reset(true);
+            }
+
+            reset(initial = false) {
+                // x, y: 在屏幕中心的随机坐标
+                // z: 深度 (距离)
+                
+                // 在以中心为原点的坐标系中随机分布
+                // 范围稍微大一点，以确保能填满屏幕
+                this.x = (Math.random() - 0.5) * width * 2;
+                this.y = (Math.random() - 0.5) * height * 2;
+                
+                if (initial) {
+                    // 初始时让星星随机分布在整个 Z 轴，不要一次性全部生成
+                    this.z = Math.random() * width; 
+                } else {
+                    // 重置时放到最远处
+                    this.z = width; 
+                }
+                
+                // 保存上一帧的 z 值，用于绘制拖尾效果
+                this.pz = this.z; 
+            }
+
+            update() {
+                // 根据速度减少 Z 值 (向屏幕移动)
+                this.z = this.z - speed;
+
+                // 如果星星跑到屏幕后面了 (z <= 0) 或者跑出视野了，重置
+                if (this.z < 1) {
+                    this.reset();
+                }
+            }
+
+            draw() {
+                // 3D 到 2D 的透视投影计算
+                // 公式: screen_x = x / z * constant
+                
+                // 应用轻微的鼠标旋转偏移
+                let sx = this.x - rotX;
+                let sy = this.y + rotY;
+
+                // 计算当前帧的屏幕位置
+                // 乘数 500 是视野常数，值越小，视野越广(物体看起来越远且移动越慢)
+                let px = (sx / this.z) * (width < height ? width : height) + cx;
+                let py = (sy / this.z) * (width < height ? width : height) + cy;
+
+                // 计算上一帧的位置 (用于绘制线条/拖尾)
+                let r = (width < height ? width : height) / this.z;
+                let ppx = (sx / this.pz) * (width < height ? width : height) + cx;
+                let ppy = (sy / this.pz) * (width < height ? width : height) + cy;
+
+                // 保存上一帧 Z 值
+                this.pz = this.z;
+
+                // 颜色和大小随深度变化：越近越亮、越大
+                // 透明度随距离衰减
+                let alpha = 1 - (this.z / width);
+                
+                // 只有在屏幕范围内才绘制
+                if (px >= 0 && px <= width && py >= 0 && py <= height) {
+                    ctx.lineWidth = alpha * 2; // 距离越近线条越粗
+                    
+                    // 颜色：中心白，边缘微蓝
+                    ctx.strokeStyle = `rgba(200, 220, 255, ${alpha})`;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(ppx, ppy); // 上一帧位置
+                    ctx.lineTo(px, py);   // 当前帧位置 (制造速度线效果)
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // 初始化
+        function init() {
+            resize();
+            window.addEventListener('resize', resize);
+            
+            // 创建星星
+            for (let i = 0; i < STAR_COUNT; i++) {
+                stars.push(new Star());
+            }
+
+            // 鼠标交互控制
+            document.addEventListener('mousemove', (e) => {
+                // Y轴控制速度
+                let speedFactor = (window.innerHeight - e.clientY) / window.innerHeight;
+                // 限制速度范围 5 到 50
+                speed = 5 + (speedFactor * 45); 
+
+                // 更新 UI
+                let percent = Math.round((speed - 5) / 45 * 100);
+                speedBar.style.width = percent + '%';
+                speedText.innerText = `WARP ${(percent / 20).toFixed(1)}`;
+
+                // X轴控制轻微的方向偏移 (让飞船看起来在转弯)
+                rotX = (e.clientX - window.innerWidth / 2) * 2;
+                rotY = (e.clientY - window.innerHeight / 2) * 0.5;
+            });
+
+            animate();
+        }
+
+        // 动画循环
+        function animate() {
+            // 1. 清空画布 (使用半透明黑色可以制造更长的光影拖尾，如果想要清晰效果用 clearRect)
+            // 这里使用全黑清空，因为我们在星星类里画了线，拖尾效果已经由线条连接实现了
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, width, height);
+
+            // 2. 更新并绘制所有星星
+            // 使用 for 循环比 forEach 性能稍好
+            for (let i = 0; i < stars.length; i++) {
+                stars[i].update();
+                stars[i].draw();
+            }
+
+            // 3. 循环
+            requestAnimationFrame(animate);
+        }
+
+        // 启动
+        init();
+
+    </script>
+</body>
+</html>

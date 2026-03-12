@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>水银融合灯效 (CSS Gooey Effect)</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0f0c29; /* 深色背景衬托发光效果 */
+            font-family: sans-serif;
+        }
+
+        /* 
+           核心原理：
+           1. background: transparent; - 容器本身透明
+           2. filter: blur(10px) contrast(20); 
+              - blur: 让内部的圆圈变模糊
+              - contrast: 强制将模糊的边缘变得锐利
+              - 当两个模糊的圆靠近时，中间的重叠部分颜色足够深，
+                会被 contrast 滤镜保留下来，形成连接；远离时连接断开。
+        */
+        .lava-lamp-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0f0c29;
+            /* 增加一点径向渐变，让中间亮四周暗，更有氛围 */
+            background: radial-gradient(circle at center, #302b63 0%, #0f0c29 100%);
+            filter: blur(12px) contrast(25);
+        }
+
+        /* 液滴样式 */
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            /* 径向渐变模拟球体立体感 */
+            background: radial-gradient(circle at 30% 30%, #ff0080, #7928ca); 
+            /* 使用 will-change 优化动画性能 */
+            will-change: transform; 
+        }
+
+        /* 说明文字 */
+        .hint {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.3);
+            pointer-events: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="lava-lamp-container" id="lamp">
+        <!-- 液滴将通过JS生成 -->
+    </div>
+    
+    <div class="hint">浏览器窗口大小改变时会自动重置</div>
+
+    <script>
+        class Blob {
+            constructor(container) {
+                this.container = container;
+                this.init();
+            }
+
+            init() {
+                // 随机生成大小 (40px 到 100px)
+                this.size = Math.random() * 60 + 40;
+                
+                // 随机初始位置
+                this.x = Math.random() * (window.innerWidth - this.size);
+                this.y = Math.random() * (window.innerHeight - this.size);
+                
+                // 随机速度向量 (-1.5 到 1.5)
+                this.vx = (Math.random() - 0.5) * 3;
+                this.vy = (Math.random() - 0.5) * 3;
+
+                // 创建DOM元素
+                this.element = document.createElement('div');
+                this.element.classList.add('blob');
+                this.element.style.width = `${this.size}px`;
+                this.element.style.height = `${this.size}px`;
+                
+                // 初始渲染
+                this.updateStyle();
+                this.container.appendChild(this.element);
+            }
+
+            update() {
+                // 更新位置
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // 边界检测（碰到边缘反弹）
+                if (this.x <= 0 || this.x + this.size >= window.innerWidth) {
+                    this.vx *= -1;
+                    // 防止卡在墙里，稍微推回来
+                    this.x = Math.max(0, Math.min(this.x, window.innerWidth - this.size));
+                }
+                if (this.y <= 0 || this.y + this.size >= window.innerHeight) {
+                    this.vy *= -1;
+                    this.y = Math.max(0, Math.min(this.y, window.innerHeight - this.size));
+                }
+
+                this.updateStyle();
+            }
+
+            updateStyle() {
+                // 使用 transform 移动比 top/left 性能更好
+                this.element.style.transform = `translate(${this.x}px, ${this.y}px)`;
+            }
+        }
+
+        // 初始化系统
+        const container = document.getElementById('lamp');
+        const blobs = [];
+        const blobCount = 12; // 液滴数量
+
+        function init() {
+            // 清空容器
+            container.innerHTML = '';
+            blobs.length = 0;
+            
+            // 创建新的液滴
+            for (let i = 0; i < blobCount; i++) {
+                blobs.push(new Blob(container));
+            }
+        }
+
+        // 动画循环
+        function animate() {
+            for (let blob of blobs) {
+                blob.update();
+            }
+            requestAnimationFrame(animate);
+        }
+
+        // 启动
+        init();
+        animate();
+
+        // 窗口大小改变时重置，防止液滴消失在视野外
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(init, 200);
+        });
+
+    </script>
+</body>
+</html>

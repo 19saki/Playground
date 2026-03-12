@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>炫彩粒子跟随特效</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* 防止出现滚动条 */
+            background-color: #000; /* 背景黑色 */
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* 提示文字 */
+        .instructions {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.5);
+            font-family: "Microsoft YaHei", sans-serif;
+            pointer-events: none; /* 这里的文字不阻挡鼠标事件 */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="instructions">移动鼠标查看特效</div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let particlesArray = [];
+        let hue = 0; // 用于控制颜色循环
+
+        // 鼠标坐标对象
+        const mouse = {
+            x: undefined,
+            y: undefined
+        };
+
+        // 设置画布尺寸
+        function setCanvasSize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        window.addEventListener('resize', setCanvasSize);
+        setCanvasSize();
+
+        // 监听鼠标移动
+        window.addEventListener('mousemove', function(event) {
+            mouse.x = event.x;
+            mouse.y = event.y;
+            
+            // 每次鼠标移动时生成 5 个粒子
+            for (let i = 0; i < 5; i++) {
+                particlesArray.push(new Particle());
+            }
+        });
+
+        // 粒子类
+        class Particle {
+            constructor() {
+                this.x = mouse.x;
+                this.y = mouse.y;
+                
+                // 随机生成大小
+                this.size = Math.random() * 8 + 1;
+                
+                // 随机生成速度 (X和Y轴)
+                this.speedX = Math.random() * 3 - 1.5;
+                this.speedY = Math.random() * 3 - 1.5;
+                
+                // 颜色基于当前的 hue 值
+                this.color = `hsl(${hue}, 100%, 50%)`;
+            }
+
+            // 更新粒子状态
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                
+                // 粒子逐渐变小
+                if (this.size > 0.2) this.size -= 0.1;
+            }
+
+            // 绘制粒子
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function handleParticles() {
+            for (let i = 0; i < particlesArray.length; i++) {
+                particlesArray[i].update();
+                particlesArray[i].draw();
+
+                // 如果粒子太小，则从数组中移除它
+                if (particlesArray[i].size <= 0.3) {
+                    particlesArray.splice(i, 1);
+                    i--;
+                }
+            }
+        }
+
+        function animate() {
+            // 关键点：使用半透明矩形覆盖画布，产生拖尾效果
+            // 如果想让拖尾更长，把 0.1 改成更小（如 0.05）
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            handleParticles();
+            
+            // 改变颜色值，实现彩虹效果
+            hue += 2;
+            
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        // 移动端支持：触摸滑动
+        window.addEventListener('touchmove', function(event) {
+            mouse.x = event.touches[0].clientX;
+            mouse.y = event.touches[0].clientY;
+            for (let i = 0; i < 5; i++) {
+                particlesArray.push(new Particle());
+            }
+        });
+    </script>
+</body>
+</html>

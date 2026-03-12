@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive SVG Bar Chart</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: #e2e8f0;
+        }
+
+        /* Tooltip Styling */
+        #tooltip {
+            position: absolute;
+            display: none;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(4px);
+            border: 1px solid #334155;
+            padding: 8px 12px;
+            border-radius: 6px;
+            pointer-events: none;
+            font-size: 0.875rem;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            z-index: 50;
+            transform: translate(-50%, -120%);
+            transition: opacity 0.2s ease;
+        }
+
+        /* SVG Specific Styles */
+        .bar {
+            transition: fill 0.3s ease, filter 0.3s ease;
+            cursor: pointer;
+            transform-box: fill-box;
+            transform-origin: bottom;
+        }
+
+        .bar:hover {
+            filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6));
+        }
+
+        .axis-line, .grid-line {
+            stroke: #334155;
+            stroke-width: 1;
+        }
+
+        .grid-line {
+            stroke-dasharray: 4;
+            opacity: 0.4;
+        }
+
+        .axis-text {
+            fill: #94a3b8;
+            font-size: 10px;
+            text-anchor: middle;
+        }
+
+        .y-axis-text {
+            text-anchor: end;
+            dominant-baseline: middle;
+        }
+
+        /* Button Animation */
+        .btn-animate {
+            transition: all 0.2s ease;
+        }
+        .btn-animate:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <!-- Main Card -->
+    <div class="w-full max-w-3xl bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden relative">
+        
+        <!-- Header -->
+        <div class="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
+            <div>
+                <h1 class="text-2xl font-bold text-white tracking-tight">Weekly Analytics</h1>
+                <p class="text-slate-400 text-sm mt-1">Real-time traffic data visualization</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                <span class="text-xs font-medium text-emerald-400 uppercase tracking-wider">Live</span>
+            </div>
+        </div>
+
+        <!-- Chart Area -->
+        <div class="p-6 relative" id="chart-wrapper">
+            <!-- Tooltip Element -->
+            <div id="tooltip">
+                <div class="font-bold text-sky-400 mb-1" id="tt-title">Day</div>
+                <div class="flex justify-between gap-4 text-slate-300">
+                    <span>Traffic:</span>
+                    <span class="font-mono font-bold text-white" id="tt-value">0</span>
+                </div>
+            </div>
+
+            <!-- SVG Container -->
+            <div class="w-full aspect-[2/1] relative">
+                <svg id="chart-svg" width="100%" height="100%" viewBox="0 0 600 300" class="overflow-visible">
+                    <defs>
+                        <linearGradient id="barGradient" x1="0" x2="0" y1="0" y2="1">
+                            <stop offset="0%" stop-color="#38bdf8" />
+                            <stop offset="100%" stop-color="#3b82f6" />
+                        </linearGradient>
+                        <linearGradient id="barGradientHover" x1="0" x2="0" y1="0" y2="1">
+                            <stop offset="0%" stop-color="#7dd3fc" />
+                            <stop offset="100%" stop-color="#60a5fa" />
+                        </linearGradient>
+                    </defs>
+                    
+                    <!-- Groups for layering -->
+                    <g id="grid-layer"></g>
+                    <g id="bars-layer"></g>
+                    <g id="labels-layer"></g>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Controls & Stats -->
+        <div class="bg-slate-900/50 p-6 border-t border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex gap-6 text-sm">
+                <div>
+                    <span class="block text-slate-500 text-xs uppercase tracking-wider">Average</span>
+                    <span class="text-xl font-bold text-white" id="stat-avg">0</span>
+                </div>
+                <div>
+                    <span class="block text-slate-500 text-xs uppercase tracking-wider">Peak</span>
+                    <span class="text-xl font-bold text-white" id="stat-max">0</span>
+                </div>
+                <div>
+                    <span class="block text-slate-500 text-xs uppercase tracking-wider">Total</span>
+                    <span class="text-xl font-bold text-white" id="stat-total">0</span>
+                </div>
+            </div>
+
+            <button onclick="generateRandomData()" class="btn-animate group relative px-6 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-medium rounded-lg shadow-lg shadow-sky-900/20 flex items-center gap-2 overflow-hidden">
+                <div class="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1s_infinite]"></div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Randomize Data</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            svgWidth: 600,
+            svgHeight: 300,
+            margin: { top: 20, right: 20, bottom: 30, left: 40 },
+            maxVal: 100,
+            animationDuration: 800, // ms
+            barColor: "url(#barGradient)",
+            barHoverColor: "url(#barGradientHover)"
+        };
+
+        // State
+        let data = [45, 80, 20, 95, 60, 35, 70];
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        
+        // DOM Elements
+        const svg = document.getElementById('chart-svg');
+        const gridLayer = document.getElementById('grid-layer');
+        const barsLayer = document.getElementById('bars-layer');
+        const labelsLayer = document.getElementById('labels-layer');
+        const tooltip = document.getElementById('tooltip');
+        const ttTitle = document.getElementById('tt-title');
+        const ttValue = document.getElementById('tt-value');
+
+        // Helpers
+        const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
+
+        // Stats Update
+        function updateStats(data) {
+            const total = data.reduce((a, b) => a + b, 0);
+            const max = Math.max(...data);
+            const avg = Math.round(total / data.length);
+
+            // Simple count up animation for stats
+            animateValue("stat-total", parseInt(document.getElementById("stat-total").innerText), total, 1000);
+            animateValue("stat-max", parseInt(document.getElementById("stat-max").innerText), max, 1000);
+            animateValue("stat-avg", parseInt(document.getElementById("stat-avg").innerText), avg, 1000);
+        }
+
+        function animateValue(id, start, end, duration) {
+            if (start === end) return;
+            const range = end - start;
+            let current = start;
+            const increment = end > start ? 1 : -1;
+            const stepTime = Math.abs(Math.floor(duration / range));
+            const obj = document.getElementById(id);
+            
+            // If step is too fast, just jump
+            if (Math.abs(range) > 100 && stepTime < 10) {
+                 obj.innerHTML = end;
+                 return;
+            }
+
+            const timer = setInterval(function() {
+                current += increment;
+                obj.innerHTML = current;
+                if (current == end) {
+                    clearInterval(timer);
+                }
+            }, Math.max(stepTime, 10));
+            
+            // Fallback to ensure it ends correctly if range is small
+            setTimeout(() => obj.innerHTML = end, duration + 50);
+        }
+
+        // Core Chart Logic
+        function renderChart(newData) {
+            const width = CONFIG.svgWidth - CONFIG.margin.left - CONFIG.margin.right;
+            const height = CONFIG.svgHeight - CONFIG.margin.top - CONFIG.margin.bottom;
+            const barWidth = (width / newData.length) * 0.6; // 60% width, 40% gap
+            const gap = (width / newData.length) * 0.4;
+            
+            // Clear previous contents (only once, on init)
+            if (barsLayer.children.length === 0) {
+                initGrid(width, height);
+                initLabels(width, height, newData.length);
+            }
+
+            // Update or Create Bars
+            newData.forEach((value, index) => {
+                const x = CONFIG.margin.left + (index * (barWidth + gap)) + (gap / 2);
+                const barHeight = (value / CONFIG.maxVal) * height;
+                const y = CONFIG.margin.top + height - barHeight;
+                
+                let rect = document.getElementById(`bar-${index}`);
+                
+                // Create if not exists
+                if (!rect) {
+                    rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    rect.setAttribute("id", `bar-${index}`);
+                    rect.setAttribute("x", x);
+                    rect.setAttribute("width", barWidth);
+                    rect.setAttribute("rx", 4); // Rounded top corners
+                    rect.setAttribute("fill", CONFIG.barColor);
+                    rect.setAttribute("class", "bar");
+                    
+                    // Initial height 0 for entrance animation
+                    rect.setAttribute("y", CONFIG.margin.top + height);
+                    rect.setAttribute("height", 0);
+
+                    // Events
+                    rect.addEventListener('mouseenter', (e) => handleMouseEnter(e, index, value));
+                    rect.addEventListener('mousemove', (e) => handleMouseMove(e));
+                    rect.addEventListener('mouseleave', handleMouseLeave);
+
+                    barsLayer.appendChild(rect);
+                }
+
+                // Update Position & Animate Height
+                // We use JS to animate attributes or CSS transitions.
+                // CSS transitions on SVG geometry can be tricky, so we use a small timeout trick 
+                // or CSS transition if strictly defined.
+                
+                rect.setAttribute("x", x);
+                rect.setAttribute("width", barWidth);
+                
+                // Trigger Reflow for CSS transition if we were using CSS classes, 
+                // but here we rely on the CSS 'transition' property defined in <style>
+                // We update the attributes directly. CSS transition handles the smoothness.
+                rect.setAttribute("y", y);
+                rect.setAttribute("height", barHeight);
+            });
+
+            updateStats(newData);
+        }
+
+        function initGrid(w, h) {
+            // Horizontal Grid Lines
+            const steps = 5;
+            for (let i = 0; i <= steps; i++) {
+                const y = CONFIG.margin.top + (h * (i / steps));
+                const val = Math.round(CONFIG.maxVal * (1 - i / steps));
+                
+                // Line
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", CONFIG.margin.left);
+                line.setAttribute("y1", y);
+                line.setAttribute("x2", CONFIG.margin.left + w);
+                line.setAttribute("y2", y);
+                line.setAttribute("class", "grid-line");
+                gridLayer.appendChild(line);
+
+                // Y-Axis Label
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                text.setAttribute("x", CONFIG.margin.left - 10);
+                text.setAttribute("y", y);
+                text.setAttribute("class", "axis-text y-axis-text");
+                text.textContent = val;
+                gridLayer.appendChild(text);
+            }
+        }
+
+        function initLabels(w, h, count) {
+            labelsLayer.innerHTML = ''; // Clear
+            const step = w / count;
+            
+            for(let i=0; i<count; i++) {
+                const x = CONFIG.margin.left + (i * step) + (step/2);
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                text.setAttribute("x", x);
+                text.setAttribute("y", CONFIG.margin.top + h + 20);
+                text.setAttribute("class", "axis-text");
+                text.textContent = days[i] || `Item ${i+1}`;
+                labelsLayer.appendChild(text);
+            }
+        }
+
+        // Tooltip Logic
+        function handleMouseEnter(e, index, value) {
+            const rect = e.target;
+            rect.setAttribute("fill", CONFIG.barHoverColor);
+            
+            // Populate Tooltip
+            ttTitle.textContent = days[index];
+            ttValue.textContent = value;
+            
+            // Show
+            tooltip.style.display = 'block';
+            tooltip.style.opacity = '1';
+        }
+
+        function handleMouseMove(e) {
+            // Position tooltip relative to chart container to avoid overflow issues
+            // We use client coordinates relative to the viewport
+            const x = e.clientX;
+            const y = e.clientY;
+            
+            // Add scroll offset if needed, but fixed/absolute positioning usually works with client
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
+        }
+
+        function handleMouseLeave(e) {
+            const rect = e.target;
+            rect.setAttribute("fill", CONFIG.barColor);
+            
+            tooltip.style.opacity = '0';
+            setTimeout(() => {
+                if(tooltip.style.opacity === '0') tooltip.style.display = 'none';
+            }, 200);
+        }
+
+        // Data Generation
+        function generateRandomData() {
+            const count = 7; // Keep 7 days, or randomize count: randomInt(5, 12)
+            const newData = Array.from({length: count}, () => randomInt(10, 100));
+            
+            // If count changes, we need to clear bars to avoid ghost bars
+            // But for this demo, we keep count constant (7 days) to keep it simple and beautiful
+            data = newData;
+            renderChart(data);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            renderChart(data);
+        });
+
+    </script>
+</body>
+</html>

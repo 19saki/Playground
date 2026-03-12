@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniMax 网页钢琴 (Web Piano)</title>
+    <style>
+        :root {
+            --bg-color: #2c3e50;
+            --piano-bg: #1a1a1a;
+            --white-key: #fdfdfd;
+            --black-key: #111;
+            --active-color: #ffd700;
+            --text-color: #ecf0f1;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-color);
+            overflow: hidden;
+            user-select: none;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            font-weight: 300;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .instructions {
+            margin-bottom: 30px;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .key-label {
+            display: inline-block;
+            padding: 5px 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+            margin: 0 5px;
+            font-family: monospace;
+        }
+
+        /* 钢琴容器 */
+        .piano {
+            position: relative;
+            display: flex;
+            background: var(--piano-bg);
+            padding: 10px 10px 0 10px;
+            border-radius: 10px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        /* 通用按键样式 */
+        .key {
+            position: relative;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            border-radius: 0 0 5px 5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding-bottom: 10px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* 白键样式 */
+        .key.white {
+            width: 60px;
+            height: 220px;
+            background: var(--white-key);
+            border: 1px solid #ccc;
+            border-top: 1px solid #999;
+            color: #555;
+            z-index: 1;
+            box-shadow: inset 0 -5px 10px rgba(0,0,0,0.1);
+        }
+
+        .key.white:active, .key.white.active {
+            background: #eee;
+            transform: translateY(2px);
+            box-shadow: inset 0 -2px 5px rgba(0,0,0,0.2);
+            background: linear-gradient(to bottom, #fff 0%, #e6e6e6 100%);
+        }
+
+        /* 黑键样式 */
+        .key.black {
+            width: 40px;
+            height: 140px;
+            background: var(--black-key);
+            color: #fff;
+            z-index: 2;
+            position: absolute;
+            top: 0;
+            border-radius: 0 0 3px 3px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+            border: 1px solid #000;
+            border-top: none;
+        }
+
+        .key.black:active, .key.black.active {
+            background: #333;
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            transform: translateY(2px);
+            border-bottom: none;
+        }
+
+        /* 激活时的文字高亮 */
+        .key.active span {
+            color: #d35400;
+        }
+        .key.black.active span {
+            color: #e67e22;
+        }
+
+        /* 启动遮罩层 */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            cursor: pointer;
+            flex-direction: column;
+        }
+
+        #overlay h2 {
+            color: white;
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+
+        #overlay p {
+            color: #aaa;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 启动遮罩 -->
+    <div id="overlay">
+        <h2>点击屏幕开启钢琴</h2>
+        <p>使用键盘 A-K (白键) 和 W-E-T-Y-U (黑键) 弹奏</p>
+    </div>
+
+    <h1>MiniMax Web Piano</h1>
+    <div class="instructions">
+        <span class="key-label">A</span> 
+        <span class="key-label">S</span> 
+        <span class="key-label">D</span> 
+        <span class="key-label">F</span> 
+        <span class="key-label">G</span> 
+        <span class="key-label">H</span> 
+        <span class="key-label">J</span> 
+        <span class="key-label">K</span>
+    </div>
+
+    <div class="piano">
+        <!-- 白键 -->
+        <div class="key white" data-note="C4" data-key="KeyA"><span>A</span></div>
+        <div class="key white" data-note="D4" data-key="KeyS"><span>S</span></div>
+        <div class="key white" data-note="E4" data-key="KeyD"><span>D</span></div>
+        <div class="key white" data-note="F4" data-key="KeyF"><span>F</span></div>
+        <div class="key white" data-note="G4" data-key="KeyG"><span>G</span></div>
+        <div class="key white" data-note="A4" data-key="KeyH"><span>H</span></div>
+        <div class="key white" data-note="B4" data-key="KeyJ"><span>J</span></div>
+        <div class="key white" data-note="C5" data-key="KeyK"><span>K</span></div>
+
+        <!-- 黑键 (绝对定位) -->
+        <!-- C# 位于 A 和 S 之间 -->
+        <div class="key black" style="left: 45px;" data-note="C#4" data-key="KeyW"><span>W</span></div>
+        <!-- D# 位于 S 和 D 之间 -->
+        <div class="key black" style="left: 105px;" data-note="D#4" data-key="KeyE"><span>E</span></div>
+        <!-- F# 位于 F 和 G 之间 -->
+        <div class="key black" style="left: 225px;" data-note="F#4" data-key="KeyT"><span>T</span></div>
+        <!-- G# 位于 G 和 H 之间 -->
+        <div class="key black" style="left: 285px;" data-note="G#4" data-key="KeyY"><span>Y</span></div>
+        <!-- A# 位于 H 和 J 之间 -->
+        <div class="key black" style="left: 345px;" data-note="A#4" data-key="KeyU"><span>U</span></div>
+    </div>
+
+    <script>
+        // 音频上下文
+        let audioCtx;
+        
+        // 音符频率映射 (Hz)
+        const notes = {
+            'KeyA': 261.63, // C4
+            'KeyW': 277.18, // C#4
+            'KeyS': 293.66, // D4
+            'KeyE': 311.13, // D#4
+            'KeyD': 329.63, // E4
+            'KeyF': 349.23, // F4
+            'KeyT': 369.99, // F#4
+            'KeyG': 392.00, // G4
+            'KeyY': 415.30, // G#4
+            'KeyH': 440.00, // A4
+            'KeyU': 466.16, // A#4
+            'KeyJ': 493.88, // B4
+            'KeyK': 523.25  // C5
+        };
+
+        // 存储当前正在播放的振荡器
+        const activeOscillators = {};
+        
+        // 按键状态映射，防止按住重复触发
+        const keyState = {};
+
+        // 初始化音频上下文
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // 播放音符
+        function playNote(keyCode) {
+            if (!audioCtx) initAudio();
+            if (keyState[keyCode]) return; // 如果按键已按住，不重复触发
+            keyState[keyCode] = true;
+
+            const frequency = notes[keyCode];
+            if (!frequency) return;
+
+            // 可视化反馈
+            const keys = document.querySelectorAll('.key');
+            keys.forEach(k => {
+                if (k.dataset.key === keyCode) {
+                    k.classList.add('active');
+                }
+            });
+
+            // 创建振荡器 (声音源)
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            osc.type = 'triangle'; // 三角波听起来比较像钢琴
+            osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+            // 连接节点: 振荡器 -> 增益节点 -> 输出
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            // 音量包络 (ADSR) - 模拟按键敲击感
+            const now = audioCtx.currentTime;
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.6, now + 0.02); // 快速起音
+            gainNode.gain.exponentialRampToValueAtTime(0.001, now + 1.5); // 缓慢衰减
+
+            osc.start(now);
+
+            // 存储振荡器引用以便停止
+            activeOscillators[keyCode] = { osc, gainNode };
+        }
+
+        // 停止音符
+        function stopNote(keyCode) {
+            if (!keyState[keyCode]) return;
+            keyState[keyCode] = false;
+
+            // 移除可视化
+            const keys = document.querySelectorAll('.key');
+            keys.forEach(k => {
+                if (k.dataset.key === keyCode) {
+                    k.classList.remove('active');
+                }
+            });
+
+            const sound = activeOscillators[keyCode];
+            if (sound) {
+                const { osc, gainNode } = sound;
+                const now = audioCtx.currentTime;
+                
+                // 释放音效 (Release)
+                // 如果快速松开，直接淡出；如果还没衰减完，继续衰减
+                gainNode.gain.cancelScheduledValues(now);
+                gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+                // 停止振荡器
+                osc.stop(now + 0.3);
+                
+                // 清理引用
+                setTimeout(() => {
+                    osc.disconnect();
+                    gainNode.disconnect();
+                }, 350);
+                
+                delete activeOscillators[keyCode];
+            }
+        }
+
+        // 事件监听 - 键盘按下
+        document.addEventListener('keydown', (e) => {
+            // 防止按键重复触发 (按住不放)
+            if (e.repeat) return;
+            playNote(e.code);
+        });
+
+        // 事件监听 - 键盘松开
+        document.addEventListener('keyup', (e) => {
+            stopNote(e.code);
+        });
+
+        // 点击界面启动
+        document.getElementById('overlay').addEventListener('click', function() {
+            initAudio();
+            this.classList.add('hidden');
+        });
+
+        // 鼠标点击支持 (点击白键/黑键)
+        document.querySelectorAll('.key').forEach(key => {
+            key.addEventListener('mousedown', () => {
+                const keyCode = key.dataset.key;
+                playNote(keyCode);
+            });
+            key.addEventListener('mouseup', () => {
+                const keyCode = key.dataset.key;
+                stopNote(keyCode);
+            });
+            key.addEventListener('mouseleave', () => {
+                const keyCode = key.dataset.key;
+                stopNote(keyCode);
+            });
+        });
+    </script>
+</body>
+</html>

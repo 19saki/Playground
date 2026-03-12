@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>打字速度测试（WPM）</title>
+  <style>
+    :root { --fg:#111; --muted:#666; --ok:#1a7f37; --bad:#d1242f; --card:#f6f7f9; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      margin: 24px; color: var(--fg); background: #fff; }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+    .tip { color: var(--muted); margin: 0 0 14px; line-height: 1.5; }
+    .card { background: var(--card); border: 1px solid #e6e8ee; border-radius: 12px; padding: 14px; }
+    #text {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 16px; line-height: 1.8;
+      padding: 12px; border-radius: 10px; background: #fff; border: 1px solid #e6e8ee;
+      user-select: none; white-space: pre-wrap; word-break: break-word;
+    }
+    #text span.correct { color: var(--ok); }
+    #text span.wrong { color: var(--bad); background: rgba(209,36,47,0.12); border-radius: 4px; }
+    #text span.current { border-bottom: 2px solid #111; }
+    textarea {
+      width: 100%; margin-top: 12px; padding: 12px;
+      border: 1px solid #cfd6e4; border-radius: 10px;
+      font-size: 16px; line-height: 1.6;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      resize: vertical; min-height: 120px;
+    }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+    .stat { color: var(--muted); }
+    .stat b { color: var(--fg); font-variant-numeric: tabular-nums; }
+    button {
+      padding: 10px 12px; border: 1px solid #cfd6e4; border-radius: 10px;
+      background: #fff; cursor: pointer;
+    }
+    button:hover { background: #f2f4f8; }
+    #result { margin-top: 10px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>打字速度测试（WPM）</h1>
+    <p class="tip">
+      规则：从下方文字开始输入，第一次输入自动开始计时；输入到末尾自动结束并显示 WPM。<br>
+      WPM 按常见定义计算：WPM =（正确字符数 / 5）/ 用时分钟。
+    </p>
+
+    <div class="card">
+      <div id="text" aria-label="要输入的文本"></div>
+
+      <textarea id="input" placeholder="在这里开始输入…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+
+      <div class="row">
+        <div class="stat">用时：<b><span id="time">0.0</span>s</b></div>
+        <div class="stat">WPM：<b><span id="wpm">0.0</span></b></div>
+        <div class="stat">准确率：<b><span id="acc">100.0</span>%</b></div>
+        <button id="restart" type="button">重新开始</button>
+      </div>
+
+      <div id="result" role="status" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <script>
+    // 想换测试文本，改这里即可：
+    const TARGET_TEXT =
+      "The best time to start improving your typing is now. Focus on accuracy first, keep a steady rhythm, and speed will follow.";
+
+    const textEl = document.getElementById("text");
+    const inputEl = document.getElementById("input");
+    const timeEl = document.getElementById("time");
+    const wpmEl  = document.getElementById("wpm");
+    const accEl  = document.getElementById("acc");
+    const resultEl = document.getElementById("result");
+    const restartBtn = document.getElementById("restart");
+
+    let startTime = null;
+    let timerId = null;
+    let finished = false;
+
+    function countCorrect(typed, target) {
+      const n = Math.min(typed.length, target.length);
+      let correct = 0;
+      for (let i = 0; i < n; i++) if (typed[i] === target[i]) correct++;
+      return correct;
+    }
+
+    function render(typed) {
+      textEl.innerHTML = "";
+      for (let i = 0; i < TARGET_TEXT.length; i++) {
+        const span = document.createElement("span");
+        span.textContent = TARGET_TEXT[i];
+
+        if (i < typed.length) {
+          span.className = (typed[i] === TARGET_TEXT[i]) ? "correct" : "wrong";
+        } else if (i === typed.length && !finished) {
+          span.className = "current";
+        }
+        textEl.appendChild(span);
+      }
+    }
+
+    function updateLiveStats() {
+      if (startTime == null) return;
+
+      const now = performance.now();
+      const elapsedMs = now - startTime;
+      const elapsedMin = Math.max(elapsedMs / 60000, 1e-9);
+
+      const typed = inputEl.value.replace(/\r?\n/g, "");
+      const correct = countCorrect(typed, TARGET_TEXT);
+
+      const wpm = (correct / 5) / elapsedMin;
+      const acc = typed.length ? (correct / typed.length) * 100 : 100;
+
+      timeEl.textContent = (elapsedMs / 1000).toFixed(1);
+      wpmEl.textContent = wpm.toFixed(1);
+      accEl.textContent = acc.toFixed(1);
+    }
+
+    function start() {
+      startTime = performance.now();
+      timerId = setInterval(updateLiveStats, 100);
+    }
+
+    function finish() {
+      finished = true;
+      clearInterval(timerId);
+      timerId = null;
+      updateLiveStats();
+
+      inputEl.disabled = true;
+
+      const typed = inputEl.value.replace(/\r?\n/g, "");
+      const correct = countCorrect(typed, TARGET_TEXT);
+      const elapsedSec = parseFloat(timeEl.textContent);
+      const finalWpm = parseFloat(wpmEl.textContent);
+      const finalAcc = parseFloat(accEl.textContent);
+
+      resultEl.textContent =
+        `完成！WPM：${finalWpm.toFixed(1)}，准确率：${finalAcc.toFixed(1)}%，正确字符：${correct}/${TARGET_TEXT.length}，用时：${elapsedSec.toFixed(1)}s。`;
+    }
+
+    function reset() {
+      finished = false;
+      startTime = null;
+      clearInterval(timerId);
+      timerId = null;
+
+      inputEl.disabled = false;
+      inputEl.value = "";
+      timeEl.textContent = "0.0";
+      wpmEl.textContent = "0.0";
+      accEl.textContent = "100.0";
+      resultEl.textContent = "";
+
+      render("");
+      inputEl.focus();
+    }
+
+    inputEl.addEventListener("paste", (e) => e.preventDefault()); // 防止粘贴“刷分”
+    inputEl.addEventListener("input", () => {
+      if (finished) return;
+
+      // 去掉换行（避免移动端回车导致对不齐）
+      const sanitized = inputEl.value.replace(/\r?\n/g, "");
+      if (sanitized !== inputEl.value) inputEl.value = sanitized;
+
+      if (startTime == null && inputEl.value.length > 0) start();
+
+      render(inputEl.value);
+      updateLiveStats();
+
+      if (inputEl.value.length >= TARGET_TEXT.length) finish();
+    });
+
+    restartBtn.addEventListener("click", reset);
+
+    // init
+    render("");
+    reset();
+  </script>
+</body>
+</html>

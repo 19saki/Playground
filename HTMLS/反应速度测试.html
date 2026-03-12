@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>极速反应 | 反应速度测试</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            overflow: hidden; /* Prevent scrolling during rapid clicking */
+            user-select: none; /* Prevent text selection */
+            -webkit-tap-highlight-color: transparent;
+        }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .cursor-pointer-custom {
+            cursor: crosshair;
+        }
+        /* Smooth transitions for colors */
+        #game-area {
+            transition: background-color 0.1s ease;
+        }
+        /* Shake animation for early clicks */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        .shake {
+            animation: shake 0.5s;
+        }
+        /* Pulse for the start button */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(255,255,255,0.1); }
+            50% { box-shadow: 0 0 40px rgba(255,255,255,0.3); }
+        }
+        .animate-pulse-glow {
+            animation: pulse-glow 2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen w-screen overflow-hidden flex flex-col">
+
+    <!-- Main Game Area -->
+    <div id="game-area" class="relative flex-grow w-full flex flex-col items-center justify-center cursor-pointer-custom transition-colors duration-200 bg-slate-800">
+        
+        <!-- Header / Stats Bar (Overlay) -->
+        <div class="absolute top-0 left-0 w-full p-6 flex justify-between items-start z-10 pointer-events-none">
+            <div class="bg-black/30 backdrop-blur-md rounded-lg p-4 border border-white/10 pointer-events-auto">
+                <h1 class="text-xl font-bold tracking-wider text-white/90 mb-1">REFLEX TEST</h1>
+                <div class="flex gap-4 text-sm text-gray-300 mono">
+                    <div>
+                        <span class="block text-xs text-gray-500 uppercase">Best</span>
+                        <span id="best-score" class="text-emerald-400 font-bold">-- ms</span>
+                    </div>
+                    <div>
+                        <span class="block text-xs text-gray-500 uppercase">Avg</span>
+                        <span id="avg-score" class="text-blue-400 font-bold">-- ms</span>
+                    </div>
+                    <div>
+                        <span class="block text-xs text-gray-500 uppercase">Attempts</span>
+                        <span id="attempt-count" class="text-white font-bold">0</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Audio Toggle -->
+            <button id="sound-toggle" class="bg-black/30 backdrop-blur-md rounded-full p-3 border border-white/10 hover:bg-white/10 transition pointer-events-auto group">
+                <svg id="icon-sound-on" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                </svg>
+                <svg id="icon-sound-off" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-500 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- Central Content -->
+        <div id="main-content" class="text-center z-0 select-none pointer-events-none">
+            
+            <!-- State: IDLE -->
+            <div id="state-idle" class="block">
+                <div class="mb-8">
+                    <div class="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/20 animate-pulse-glow">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                    <h2 class="text-5xl font-bold mb-2 tracking-tight">反应速度测试</h2>
+                    <p class="text-xl text-gray-300">点击屏幕开始测试</p>
+                </div>
+                <div class="flex justify-center gap-4 text-sm text-gray-400">
+                    <span class="px-3 py-1 bg-white/5 rounded border border-white/10">等待红色</span>
+                    <span class="px-3 py-1 bg-white/5 rounded border border-white/10">变绿即点</span>
+                    <span class="px-3 py-1 bg-white/5 rounded border border-white/10">比拼毫秒</span>
+                </div>
+            </div>
+
+            <!-- State: WAITING (Red) -->
+            <div id="state-waiting" class="hidden">
+                <h2 class="text-6xl font-black tracking-tighter text-white/90 mb-4">等待...</h2>
+                <p class="text-2xl text-white/70">看到绿色请立即点击！</p>
+            </div>
+
+            <!-- State: READY (Green) -->
+            <div id="state-ready" class="hidden">
+                <h2 class="text-7xl font-black tracking-tighter text-white mb-2 drop-shadow-lg">点击!</h2>
+                <p class="text-3xl text-white/90 font-bold animate-pulse">GO GO GO</p>
+            </div>
+
+            <!-- State: RESULT -->
+            <div id="state-result" class="hidden">
+                <h2 class="text-lg text-white/70 uppercase tracking-widest mb-2">Your Reaction Time</h2>
+                <div class="text-8xl font-black mono mb-6 text-white drop-shadow-2xl" id="result-display">000</div>
+                <div class="text-3xl font-bold mb-8" id="result-message">Processing...</div>
+                <div class="inline-block px-8 py-3 bg-white/20 hover:bg-white/30 backdrop-blur rounded-full border border-white/40 cursor-pointer pointer-events-auto transition transform hover:scale-105 active:scale-95" id="btn-restart">
+                    <span class="text-xl font-bold">再测一次</span>
+                </div>
+            </div>
+
+            <!-- State: TOO SOON -->
+            <div id="state-too-soon" class="hidden">
+                <h2 class="text-6xl font-black tracking-tighter text-yellow-400 mb-4">太早了!</h2>
+                <p class="text-2xl text-white/80">你点击了红色背景。<br>请等待变绿。</p>
+                <div class="mt-8 text-sm text-white/50">点击任意处重试</div>
+            </div>
+
+        </div>
+
+        <!-- Footer Info -->
+        <div class="absolute bottom-6 w-full text-center text-white/30 text-xs pointer-events-none">
+            点击屏幕以交互 • 音频由 Tone.js 驱动
+        </div>
+    </div>
+
+    <!-- Canvas for confetti -->
+    <canvas id="confetti-canvas" class="absolute top-0 left-0 w-full h-full pointer-events-none z-50"></canvas>
+
+    <script>
+        /**
+         * Reflex Test Application Logic
+         * Handles game states, timing, audio, and visual feedback.
+         */
+        const app = {
+            // State
+            state: 'IDLE', // IDLE, WAITING, READY, RESULT, TOO_SOON
+            startTime: 0,
+            timerId: null,
+            scores: [],
+            soundEnabled: true,
+            audioContextStarted: false,
+
+            // DOM Elements
+            dom: {
+                gameArea: document.getElementById('game-area'),
+                mainContent: document.getElementById('main-content'),
+                states: {
+                    idle: document.getElementById('state-idle'),
+                    waiting: document.getElementById('state-waiting'),
+                    ready: document.getElementById('state-ready'),
+                    result: document.getElementById('state-result'),
+                    tooSoon: document.getElementById('state-too-soon'),
+                },
+                resultDisplay: document.getElementById('result-display'),
+                resultMessage: document.getElementById('result-message'),
+                stats: {
+                    best: document.getElementById('best-score'),
+                    avg: document.getElementById('avg-score'),
+                    count: document.getElementById('attempt-count'),
+                },
+                soundBtn: document.getElementById('sound-toggle'),
+                soundIconOn: document.getElementById('icon-sound-on'),
+                soundIconOff: document.getElementById('icon-sound-off'),
+                btnRestart: document.getElementById('btn-restart'),
+                canvas: document.getElementById('confetti-canvas')
+            },
+
+            // Initialization
+            init() {
+                this.bindEvents();
+                this.resizeCanvas();
+                window.addEventListener('resize', () => this.resizeCanvas());
+            },
+
+            bindEvents() {
+                // Main interaction
+                this.dom.gameArea.addEventListener('mousedown', (e) => this.handleInput(e));
+                this.dom.gameArea.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); // Prevent double firing on some devices
+                    this.handleInput(e);
+                }, { passive: false });
+
+                // Sound toggle
+                this.dom.soundBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleSound();
+                });
+
+                // Keyboard support
+                window.addEventListener('keydown', (e) => {
+                    if (e.code === 'Space' || e.code === 'Enter') {
+                        this.handleInput(e);
+                    }
+                });
+            },
+
+            toggleSound() {
+                this.soundEnabled = !this.soundEnabled;
+                if (this.soundEnabled) {
+                    this.dom.soundIconOn.classList.remove('hidden');
+                    this.dom.soundIconOff.classList.add('hidden');
+                    this.initAudio();
+                } else {
+                    this.dom.soundIconOn.classList.add('hidden');
+                    this.dom.soundIconOff.classList.remove('hidden');
+                }
+            },
+
+            async initAudio() {
+                if (!this.audioContextStarted) {
+                    await Tone.start();
+                    this.audioContextStarted = true;
+                }
+            },
+
+            // Game Logic
+            handleInput(e) {
+                // Ignore clicks on buttons unless it's the restart button inside the result state
+                if (e.target.closest('#btn-restart') && this.state === 'RESULT') {
+                    this.startGame();
+                    return;
+                }
+
+                switch (this.state) {
+                    case 'IDLE':
+                    case 'RESULT':
+                    case 'TOO_SOON':
+                        this.startGame();
+                        break;
+                    case 'WAITING':
+                        this.triggerTooSoon();
+                        break;
+                    case 'READY':
+                        this.finishGame();
+                        break;
+                }
+            },
+
+            startGame() {
+                this.initAudio();
+                this.setState('WAITING');
+                
+                // Random time between 2s and 6s
+                const delay = Math.floor(Math.random() * 4000) + 2000;
+                
+                this.timerId = setTimeout(() => {
+                    this.setState('READY');
+                }, delay);
+            },
+
+            triggerTooSoon() {
+                clearTimeout(this.timerId);
+                this.setState('TOO_SOON');
+                this.playSound('fail');
+                
+                // Shake effect
+                this.dom.gameArea.classList.add('shake');
+                setTimeout(() => this.dom.gameArea.classList.remove('shake'), 500);
+            },
+
+            finishGame() {
+                const endTime = Date.now();
+                const reactionTime = endTime - this.startTime;
+                
+                this.scores.push(reactionTime);
+                this.updateStats();
+                
+                this.dom.resultDisplay.innerText = reactionTime;
+                this.dom.resultMessage.innerText = this.getMessage(reactionTime);
+                
+                this.setState('RESULT');
+                
+                if (reactionTime < 200) {
+                    this.playSound('cheer');
+                    this.fireConfetti();
+                } else if (reactionTime < 300) {
+                    this.playSound('good');
+                } else {
+                    this.playSound('finish');
+                }
+            },
+
+            setState(newState) {
+                // Hide all states
+                Object.values(this.dom.states).forEach(el => el.classList.add('hidden'));
+                
+                this.state = newState;
+                
+                // Reset styles
+                this.dom.gameArea.className = "relative flex-grow w-full flex flex-col items-center justify-center cursor-pointer-custom transition-colors duration-200";
+
+                switch (newState) {
+                    case 'IDLE':
+                        this.dom.gameArea.classList.add('bg-slate-800');
+                        this.dom.states.idle.classList.remove('hidden');
+                        break;
+                    case 'WAITING':
+                        this.dom.gameArea.classList.add('bg-red-600');
+                        this.dom.states.waiting.classList.remove('hidden');
+                        this.playSound('start');
+                        break;
+                    case 'READY':
+                        this.startTime = Date.now();
+                        this.dom.gameArea.classList.add('bg-emerald-500');
+                        this.dom.states.ready.classList.remove('hidden');
+                        this.playSound('go');
+                        break;
+                    case 'RESULT':
+                        this.dom.gameArea.classList.add('bg-slate-900'); // Neutral dark for results
+                        this.dom.states.result.classList.remove('hidden');
+                        break;
+                    case 'TOO_SOON':
+                        this.dom.gameArea.classList.add('bg-yellow-600');
+                        this.dom.states.tooSoon.classList.remove('hidden');
+                        break;
+                }
+            },
+
+            updateStats() {
+                const count = this.scores.length;
+                const sum = this.scores.reduce((a, b) => a + b, 0);
+                const avg = Math.round(sum / count);
+                const best = Math.min(...this.scores);
+
+                this.dom.stats.count.innerText = count;
+                this.dom.stats.avg.innerText = avg + " ms";
+                this.dom.stats.best.innerText = best + " ms";
+            },
+
+            getMessage(ms) {
+                if (ms < 150) return "神级反应! 🚀";
+                if (ms < 200) return "大师水平! 🎯";
+                if (ms < 250) return "非常优秀! ⚡";
+                if (ms < 300) return "平均水平 😊";
+                if (ms < 400) return "有点慢... 🐢";
+                return "醒醒! ☕";
+            },
+
+            // Audio System (Tone.js)
+            playSound(type) {
+                if (!this.soundEnabled) return;
+
+                try {
+                    const synth = new Tone.Synth().toDestination();
+                    const membrane = new Tone.MembraneSynth().toDestination();
+                    const metal = new Tone.MetalSynth({
+                        frequency: 200,
+                        envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
+                        harmonicity: 5.1,
+                        modulationIndex: 32,
+                        resonance: 4000,
+                        octaves: 1.5
+                    }).toDestination();
+
+                    switch (type) {
+                        case 'start':
+                            // Subtle click
+                            membrane.triggerAttackRelease("C2", "32n", Tone.now(), 0.1);
+                            break;
+                        case 'go':
+                            // High pitch ping
+                            metal.triggerAttackRelease("32n", Tone.now(), 0.3);
+                            // Add a little harmony
+                            synth.triggerAttackRelease("C6", "16n", Tone.now(), 0.1);
+                            break;
+                        case 'fail':
+                            // Low buzz
+                            membrane.triggerAttackRelease("G1", "8n");
+                            setTimeout(() => membrane.triggerAttackRelease("F1", "8n"), 150);
+                            break;
+                        case 'finish':
+                            // Success chime
+                            const now = Tone.now();
+                            synth.triggerAttackRelease("C5", "16n", now);
+                            synth.triggerAttackRelease("E5", "16n", now + 0.1);
+                            break;
+                        case 'good':
+                            const now2 = Tone.now();
+                            synth.triggerAttackRelease("A4", "16n", now2);
+                            synth.triggerAttackRelease("C5", "16n", now2 + 0.1);
+                            synth.triggerAttackRelease("E5", "8n", now2 + 0.2);
+                            break;
+                        case 'cheer':
+                            const now3 = Tone.now();
+                            synth.triggerAttackRelease("C4", "8n", now3);
+                            synth.triggerAttackRelease("E4", "8n", now3 + 0.1);
+                            synth.triggerAttackRelease("G4", "8n", now3 + 0.2);
+                            synth.triggerAttackRelease("C5", "4n", now3 + 0.3);
+                            break;
+                    }
+                } catch (e) {
+                    console.error("Audio error", e);
+                }
+            },
+
+            // Visual Effects (Canvas Confetti)
+            resizeCanvas() {
+                this.dom.canvas.width = window.innerWidth;
+                this.dom.canvas.height = window.innerHeight;
+            },
+
+            fireConfetti() {
+                const ctx = this.dom.canvas.getContext('2d');
+                const particles = [];
+                const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#00ffff', '#ff00ff'];
+                
+                for(let i=0; i<100; i++) {
+                    particles.push({
+                        x: window.innerWidth / 2,
+                        y: window.innerHeight / 2,
+                        vx: (Math.random() - 0.5) * 20,
+                        vy: (Math.random() - 0.5) * 20,
+                        life: 100,
+                        color: colors[Math.floor(Math.random() * colors.length)],
+                        size: Math.random() * 5 + 2
+                    });
+                }
+
+                const animate = () => {
+                    ctx.clearRect(0, 0, this.dom.canvas.width, this.dom.canvas.height);
+                    let active = false;
+                    
+                    particles.forEach(p => {
+                        if(p.life > 0) {
+                            active = true;
+                            p.x += p.vx;
+                            p.y += p.vy;
+                            p.vy += 0.5; // gravity
+                            p.life--;
+                            p.size *= 0.96;
+                            
+                            ctx.fillStyle = p.color;
+                            ctx.beginPath();
+                            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    });
+
+                    if(active) requestAnimationFrame(animate);
+                    else ctx.clearRect(0, 0, this.dom.canvas.width, this.dom.canvas.height);
+                };
+                
+                animate();
+            }
+        };
+
+        // Start
+        document.addEventListener('DOMContentLoaded', () => {
+            app.init();
+        });
+
+    </script>
+</body>
+</html>

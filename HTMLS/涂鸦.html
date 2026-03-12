@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单网页画板</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 工具栏样式 */
+        .toolbar {
+            background: #fff;
+            padding: 10px 20px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            width: 100%;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .tool-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* 画板容器 */
+        #canvas-container {
+            flex-grow: 1;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        canvas {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            cursor: crosshair;
+            touch-action: none; /* 防止移动端拖动时页面滚动 */
+        }
+
+        button {
+            padding: 8px 15px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            background: #fff;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background: #eee;
+        }
+
+        button.active {
+            background: #007bff;
+            color: white;
+            border-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="toolbar">
+        <div class="tool-item">
+            <label>颜色:</label>
+            <input type="color" id="colorPicker" value="#000000">
+        </div>
+        
+        <div class="tool-item">
+            <label>粗细:</label>
+            <input type="range" id="lineWidth" min="1" max="50" value="5">
+            <span id="sizeDisplay">5</span>
+        </div>
+
+        <div class="tool-item">
+            <button id="eraserBtn">橡皮擦</button>
+            <button id="clearBtn">全清</button>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="paintCanvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('paintCanvas');
+        const ctx = canvas.getContext('2d');
+        const colorPicker = document.getElementById('colorPicker');
+        const lineWidthInput = document.getElementById('lineWidth');
+        const sizeDisplay = document.getElementById('sizeDisplay');
+        const clearBtn = document.getElementById('clearBtn');
+        const eraserBtn = document.getElementById('eraserBtn');
+
+        let isDrawing = false;
+        let isEraser = false;
+
+        // 初始化画板大小
+        function resizeCanvas() {
+            const container = document.getElementById('canvas-container');
+            // 设置画布宽高为容器大小（减去边距）
+            canvas.width = container.clientWidth - 40;
+            canvas.height = container.clientHeight - 40;
+            // 重新设置画笔初始状态（调整大小时画布会重置）
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // 开始绘画
+        function startDrawing(e) {
+            isDrawing = true;
+            draw(e); // 允许点击画点
+        }
+
+        // 停止绘画
+        function stopDrawing() {
+            isDrawing = false;
+            ctx.beginPath(); // 开启新路径，避免线条连到一起
+        }
+
+        // 核心绘画逻辑
+        function draw(e) {
+            if (!isDrawing) return;
+
+            // 获取坐标 (兼容鼠标和触摸)
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            ctx.lineWidth = lineWidthInput.value;
+            ctx.strokeStyle = isEraser ? '#ffffff' : colorPicker.value;
+
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        }
+
+        // 事件监听
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        window.addEventListener('mouseup', stopDrawing);
+
+        // 触摸屏支持
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDrawing(e); }, {passive: false});
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); }, {passive: false});
+        canvas.addEventListener('touchend', stopDrawing);
+
+        // 粗细数值显示
+        lineWidthInput.addEventListener('input', () => {
+            sizeDisplay.textContent = lineWidthInput.value;
+        });
+
+        // 橡皮擦切换
+        eraserBtn.addEventListener('click', () => {
+            isEraser = !isEraser;
+            eraserBtn.classList.toggle('active');
+            eraserBtn.textContent = isEraser ? '画笔模式' : '橡皮擦';
+        });
+
+        // 清除画布
+        clearBtn.addEventListener('click', () => {
+            if (confirm('确定要清除所有内容吗？')) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        });
+
+    </script>
+</body>
+</html>

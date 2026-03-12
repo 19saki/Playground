@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>深呼吸放松助手</title>
+    <style>
+        /* 页面基础样式：Flex布局居中，深色背景护眼 */
+        body {
+            background: linear-gradient(135deg, #2b5876 0%, #4e4376 100%);
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        h1 {
+            font-weight: 300;
+            letter-spacing: 2px;
+            margin-bottom: 40px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        /* 呼吸容器 */
+        .container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 300px;
+            width: 300px;
+        }
+
+        /* 外圈光晕效果 */
+        .circle-gradient {
+            background: conic-gradient(
+                #55b9f3 0%,
+                #367e9f 40%,
+                #fff 40%,
+                #fff 60%,
+                #367e9f 60%,
+                #55b9f3 100%
+            );
+            width: 320px;
+            height: 320px;
+            border-radius: 50%;
+            position: absolute;
+            z-index: -1;
+            opacity: 0.3;
+            box-shadow: 0 0 50px rgba(255, 255, 255, 0.1);
+            animation: rotate 10s linear infinite;
+        }
+
+        /* 核心呼吸圆圈 */
+        .circle {
+            background-color: #011f4b;
+            height: 200px;
+            width: 200px;
+            border-radius: 50%;
+            position: absolute;
+            z-index: 1;
+            box-shadow: 0 0 30px rgba(85, 185, 243, 0.5);
+            /* 关键：使用 transition 实现平滑缩放 */
+            transform: scale(1);
+            transition: transform 3s ease-in-out; 
+            /* 注意：这里的 3s 对应吸气和呼气的时间 */
+        }
+
+        /* 当添加 grow 类时，圆圈放大 */
+        .circle.grow {
+            transform: scale(1.5);
+        }
+
+        /* 中心文字 */
+        .text {
+            position: absolute;
+            z-index: 2;
+            font-size: 24px;
+            font-weight: bold;
+            pointer-events: none; /* 防止文字被选中 */
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-align: center;
+        }
+
+        /* 底部说明文字 */
+        .instruction {
+            margin-top: 60px;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+
+        /* 旋转动画 */
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* 简单的脉冲效果 */
+        .pointer-container {
+            position: absolute;
+            top: -40px;
+            left: 140px;
+            width: 20px;
+            height: 190px;
+            animation: rotate 7.5s linear forwards infinite;
+            transform-origin: bottom center;
+            display: none; /* 简化版本暂不使用指针，保持界面极简 */
+        }
+    </style>
+</head>
+<body>
+
+    <h1>深呼吸</h1>
+
+    <div class="container">
+        <!-- 背景光晕 -->
+        <div class="circle-gradient"></div>
+        
+        <!-- 呼吸圆圈 -->
+        <div class="circle" id="circle"></div>
+        
+        <!-- 提示文字 -->
+        <p class="text" id="text">准备...</p>
+    </div>
+
+    <p class="instruction">跟随圆圈的节奏，平静你的思绪</p>
+
+    <script>
+        const container = document.getElementById('container');
+        const text = document.getElementById('text');
+        const circle = document.getElementById('circle');
+
+        // 定义时间 (毫秒)
+        const totalTime = 7500; // 总周期 7.5秒
+        const breatheTime = 3000; // 吸气 3秒
+        const holdTime = 1500;    // 屏气 1.5秒
+        // 呼气时间 = totalTime - breatheTime - holdTime = 3秒
+
+        function breathAnimation() {
+            // 1. 吸气阶段
+            text.innerText = '吸 气';
+            circle.className = 'circle grow'; // 添加放大类
+
+            setTimeout(() => {
+                // 2. 屏气阶段
+                text.innerText = '屏 气';
+
+                setTimeout(() => {
+                    // 3. 呼气阶段
+                    text.innerText = '呼 气';
+                    circle.className = 'circle'; // 移除放大类，恢复原状
+                }, holdTime);
+
+            }, breatheTime);
+        }
+
+        // 页面加载后立即执行一次
+        breathAnimation();
+
+        // 之后设置循环定时器
+        setInterval(breathAnimation, totalTime);
+    </script>
+</body>
+</html>

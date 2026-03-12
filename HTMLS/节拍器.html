@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>专业音乐节拍器 (Pro Metronome)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: #e2e8f0;
+            overflow: hidden; /* Prevent scroll on mobile */
+            touch-action: manipulation;
+        }
+
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Custom Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #38bdf8; /* Sky 400 */
+            cursor: pointer;
+            margin-top: -10px;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+            transition: transform 0.1s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        input[type=range]:focus {
+            outline: none;
+        }
+
+        /* Beat Visualizer */
+        .beat-circle {
+            transition: all 0.1s ease-out;
+            transform-origin: center;
+        }
+        
+        .beat-active {
+            fill: #38bdf8;
+            filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.8));
+            transform: scale(1.5);
+        }
+
+        .beat-accent {
+            fill: #f472b6; /* Pink 400 */
+            filter: drop-shadow(0 0 8px rgba(244, 114, 182, 0.8));
+        }
+
+        /* Tap Button Animation */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(56, 189, 248, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+        }
+
+        .tap-active {
+            animation: pulse-ring 0.5s cubic-bezier(0.4, 0, 0.6, 1);
+        }
+
+        /* Pendulum Animation (Visual Only) */
+        #pendulum {
+            transform-origin: top center;
+            transition: transform 0.1s linear;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-between py-6 select-none">
+
+    <!-- Header -->
+    <header class="text-center space-y-1 z-10">
+        <h1 class="text-2xl font-bold tracking-widest text-sky-400 uppercase">Metronome Pro</h1>
+        <div class="text-xs text-slate-500">Web Audio • Visual • Tap Tempo</div>
+    </header>
+
+    <!-- Main Visualizer Area -->
+    <div class="relative flex-1 w-full max-w-md flex items-center justify-center">
+        
+        <!-- SVG Visualizer Ring -->
+        <svg id="beat-visualizer" class="w-80 h-80 absolute" viewBox="0 0 300 300">
+            <!-- Dynamic Circles will be injected here by JS -->
+        </svg>
+
+        <!-- Center BPM Display -->
+        <div class="z-10 flex flex-col items-center justify-center text-center relative">
+            <div class="text-slate-400 text-sm font-semibold tracking-wider mb-1">BPM</div>
+            <div id="bpm-display" class="text-7xl font-bold text-white mono-font drop-shadow-lg">100</div>
+            
+            <!-- Pendulum Visual (Simple Line) -->
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 pointer-events-none opacity-30">
+                <div id="pendulum-line" class="w-1 h-1/2 bg-sky-500 mx-auto origin-bottom rounded-full transition-transform duration-75"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls Section -->
+    <div class="w-full max-w-md px-6 space-y-8 z-10 pb-8">
+        
+        <!-- BPM Slider -->
+        <div class="space-y-2">
+            <div class="flex justify-between text-xs text-slate-400 font-mono">
+                <span>20</span>
+                <span>120</span>
+                <span>240</span>
+            </div>
+            <input type="range" id="bpm-slider" min="20" max="240" value="100" step="1">
+        </div>
+
+        <!-- Beat Signature Selector -->
+        <div class="flex justify-center gap-2" id="beat-selector">
+            <!-- Buttons injected by JS: 2, 3, 4, 5, 6 -->
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="grid grid-cols-2 gap-4">
+            <!-- Tap Tempo -->
+            <button id="tap-btn" class="group relative overflow-hidden rounded-xl bg-slate-800 p-4 transition-all active:scale-95 hover:bg-slate-700 border border-slate-700">
+                <div class="relative z-10 flex flex-col items-center">
+                    <span class="text-sm font-bold text-slate-300 uppercase tracking-widest">TAP TEMPO</span>
+                    <span class="text-xs text-slate-500 mt-1">按节奏点击</span>
+                </div>
+                <div class="absolute inset-0 bg-sky-500/10 opacity-0 group-active:opacity-100 transition-opacity"></div>
+            </button>
+
+            <!-- Start/Stop -->
+            <button id="toggle-btn" class="group relative overflow-hidden rounded-xl bg-sky-500 p-4 shadow-lg shadow-sky-500/20 transition-all active:scale-95 hover:bg-sky-400">
+                <div class="relative z-10 flex items-center justify-center gap-2">
+                    <svg id="play-icon" class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    <svg id="stop-icon" class="w-6 h-6 text-white hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                    <span id="toggle-text" class="font-bold text-white tracking-wider">START</span>
+                </div>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Metronome Application Logic
+         * Uses Web Audio API for sound generation (no external files needed).
+         * Uses requestAnimationFrame for visual sync.
+         */
+        
+        // --- Configuration & State ---
+        const state = {
+            bpm: 100,
+            beatsPerMeasure: 4,
+            isPlaying: false,
+            currentBeat: 0, // 0-indexed
+            nextNoteTime: 0.0,
+            timerID: null,
+            lookahead: 25.0, // ms
+            scheduleAheadTime: 0.1, // s
+            tapTimes: []
+        };
+
+        // --- Audio Context Setup ---
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Sound Generator: Creates a click/woodblock sound
+        function playClick(accent = false) {
+            if (!audioCtx) return;
+
+            const t = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            // Sound Design
+            if (accent) {
+                // High pitch, sharper attack for accent
+                osc.type = 'square'; 
+                osc.frequency.setValueAtTime(1200, t);
+                osc.frequency.exponentialRampToValueAtTime(100, t + 0.1);
+                gainNode.gain.setValueAtTime(0.8, t);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+            } else {
+                // Lower pitch, softer for regular beats
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(800, t);
+                osc.frequency.exponentialRampToValueAtTime(100, t + 0.1);
+                gainNode.gain.setValueAtTime(0.5, t);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+            }
+
+            osc.start(t);
+            osc.stop(t + 0.1);
+        }
+
+        // --- Scheduler Logic (The "Engine") ---
+        // Uses Web Audio clock for timing precision, setTimeout for scheduling
+        
+        function nextNote() {
+            const secondsPerBeat = 60.0 / state.bpm;
+            state.nextNoteTime += secondsPerBeat; // Add beat length to last beat time
+            state.currentBeat = (state.currentBeat + 1) % state.beatsPerMeasure;
+        }
+
+        function scheduleNote(beatNumber, time) {
+            // Push the note to the queue (for visual sync)
+            // We create a simple object to track this
+            const note = { beat: beatNumber, time: time };
+            
+            // Audio Trigger
+            // We use a small timeout to sync audio slightly with visual if needed, 
+            // but Web Audio time is absolute.
+            const isAccent = beatNumber === 0;
+            
+            // Schedule the sound using Web Audio API scheduling
+            // We create a temporary oscillator just for scheduling logic 
+            // or use the playClick function wrapper if we map time.
+            // Since playClick uses audioCtx.currentTime, we need to pass 'time' to it.
+            // Let's refactor playClick to accept a time.
+            
+            // Actually, simpler approach: 
+            // playClick runs immediately in the scheduler loop context, 
+            // but we set the osc time to 'time'.
+        }
+
+        // Re-implementing sound scheduling to respect the 'time' parameter
+        function triggerSound(time, accent) {
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (accent) {
+                osc.type = 'square'; 
+                osc.frequency.setValueAtTime(1000, time);
+                osc.frequency.exponentialRampToValueAtTime(100, time + 0.1);
+                gainNode.gain.setValueAtTime(0.8, time);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+            } else {
+                osc.type = 'sine'; // Smoother for regular beats
+                osc.frequency.setValueAtTime(600, time);
+                gainNode.frequency?.exponentialRampToValueAtTime(100, time + 0.1); // Typo fixed in logic below
+                // Fix: osc.frequency
+                osc.frequency.setValueAtTime(600, time);
+                gainNode.gain.setValueAtTime(0.5, time);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+            }
+            
+            osc.start(time);
+            osc.stop(time + 0.1);
+
+            // Trigger Visuals immediately in sync with this scheduled time
+            // We use a draw queue or requestAnimationFrame to update UI
+            requestAnimationFrame(() => {
+                drawBeat(accent);
+            });
+        }
+
+        let notesInQueue = []; // {note, time}
+
+        function scheduler() {
+            // While there are notes that will need to play before the next interval, 
+            // schedule them and advance the pointer.
+            while (state.nextNoteTime < audioCtx.currentTime + state.scheduleAheadTime) {
+                const isAccent = state.currentBeat === 0;
+                triggerSound(state.nextNoteTime, isAccent);
+                nextNote();
+            }
+            state.timerID = setTimeout(scheduler, state.lookahead);
+        }
+
+        // --- Visualizer Logic ---
+        const visualizer = document.getElementById('beat-visualizer');
+        const pendulumLine = document.getElementById('pendulum-line');
+
+        function initVisualizer() {
+            visualizer.innerHTML = '';
+            const radius = 120;
+            const center = 150;
+            const count = 6; // Max beats supported visually
+            
+            for (let i = 0; i < count; i++) {
+                const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                const angle = (i / count) * 2 * Math.PI - (Math.PI / 2); // Start at top
+                const x = center + radius * Math.cos(angle);
+                const y = center + radius * Math.sin(angle);
+                
+                circle.setAttribute("cx", x);
+                circle.setAttribute("cy", y);
+                circle.setAttribute("r", 8);
+                circle.setAttribute("fill", "#334155"); // slate-700
+                circle.setAttribute("class", "beat-circle");
+                circle.setAttribute("id", `beat-${i}`);
+                
+                visualizer.appendChild(circle);
+            }
+            updateBeatVisibility();
+        }
+
+        function updateBeatVisibility() {
+            // Hide circles beyond current beat count
+            for (let i = 0; i < 6; i++) {
+                const el = document.getElementById(`beat-${i}`);
+                if (i < state.beatsPerMeasure) {
+                    el.style.opacity = "1";
+                    el.setAttribute("r", i === 0 ? 10 : 8); // Accent beat slightly larger
+                } else {
+                    el.style.opacity = "0";
+                }
+            }
+        }
+
+        let lastBeatIndex = -1;
+
+        function drawBeat(isAccent) {
+            // Remove active class from previous
+            if (lastBeatIndex !== -1) {
+                const prev = document.getElementById(`beat-${lastBeatIndex}`);
+                if (prev) {
+                    prev.classList.remove('beat-active', 'beat-accent');
+                }
+            }
+
+            // Add active to current
+            const curr = document.getElementById(`beat-${state.currentBeat}`);
+            if (curr) {
+                curr.classList.add(isAccent ? 'beat-accent' : 'beat-active');
+            }
+            
+            // Pendulum Animation
+            // Calculate rotation based on beat index
+            // We want it to swing left/right. 
+            // Let's map beat 0 to center, then swing out.
+            // Actually, simple toggle:
+            const rot = isAccent ? 15 : -15; 
+            pendulumLine.style.transform = `rotate(${lastBeatIndex % 2 === 0 ? 20 : -20}deg)`;
+
+            lastBeatIndex = state.currentBeat;
+        }
+
+        // --- Controls & Interaction ---
+
+        const bpmSlider = document.getElementById('bpm-slider');
+        const bpmDisplay = document.getElementById('bpm-display');
+        const toggleBtn = document.getElementById('toggle-btn');
+        const playIcon = document.getElementById('play-icon');
+        const stopIcon = document.getElementById('stop-icon');
+        const toggleText = document.getElementById('toggle-text');
+        const beatSelector = document.getElementById('beat-selector');
+        const tapBtn = document.getElementById('tap-btn');
+
+        // BPM Slider
+        bpmSlider.addEventListener('input', (e) => {
+            state.bpm = parseInt(e.target.value);
+            bpmDisplay.textContent = state.bpm;
+        });
+
+        // Beat Selector Generation
+        [2, 3, 4, 5, 6].forEach(num => {
+            const btn = document.createElement('button');
+            btn.className = `w-10 h-10 rounded-lg font-bold transition-all border ${num === state.beatsPerMeasure ? 'bg-sky-500 border-sky-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`;
+            btn.textContent = num;
+            btn.onclick = () => {
+                state.beatsPerMeasure = num;
+                state.currentBeat = 0; // Reset to start
+                // Update UI styles
+                Array.from(beatSelector.children).forEach(b => {
+                    b.className = `w-10 h-10 rounded-lg font-bold transition-all border bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700`;
+                });
+                btn.className = `w-10 h-10 rounded-lg font-bold transition-all border bg-sky-500 border-sky-500 text-white shadow-lg shadow-sky-500/30`;
+                updateBeatVisibility();
+            };
+            beatSelector.appendChild(btn);
+        });
+
+        // Toggle Play/Stop
+        toggleBtn.addEventListener('click', () => {
+            initAudio();
+            
+            if (state.isPlaying) {
+                // Stop
+                clearTimeout(state.timerID);
+                state.isPlaying = false;
+                toggleText.textContent = "START";
+                playIcon.classList.remove('hidden');
+                stopIcon.classList.add('hidden');
+                toggleBtn.classList.remove('bg-red-500', 'hover:bg-red-400', 'shadow-red-500/20');
+                toggleBtn.classList.add('bg-sky-500', 'hover:bg-sky-400', 'shadow-sky-500/20');
+                
+                // Reset visuals
+                if (lastBeatIndex !== -1) {
+                    const prev = document.getElementById(`beat-${lastBeatIndex}`);
+                    if(prev) prev.classList.remove('beat-active', 'beat-accent');
+                }
+                pendulumLine.style.transform = `rotate(0deg)`;
+
+            } else {
+                // Start
+                state.currentBeat = 0; // Reset beat count
+                state.nextNoteTime = audioCtx.currentTime + 0.05; // Start slightly in future
+                scheduler();
+                state.isPlaying = true;
+                toggleText.textContent = "STOP";
+                playIcon.classList.add('hidden');
+                stopIcon.classList.remove('hidden');
+                toggleBtn.classList.remove('bg-sky-500', 'hover:bg-sky-400', 'shadow-sky-500/20');
+                toggleBtn.classList.add('bg-red-500', 'hover:bg-red-400', 'shadow-red-500/20');
+            }
+        });
+
+        // Tap Tempo Logic
+        tapBtn.addEventListener('click', () => {
+            const now = Date.now();
+            
+            // Animation
+            tapBtn.classList.remove('tap-active');
+            void tapBtn.offsetWidth; // trigger reflow
+            tapBtn.classList.add('tap-active');
+
+            // Logic
+            if (state.tapTimes.length === 0 || now - state.tapTimes[state.tapTimes.length - 1] > 2000) {
+                // Reset if pause is too long (>2s)
+                state.tapTimes = [now];
+            } else {
+                state.tapTimes.push(now);
+                
+                // Calculate average diff
+                let diffs = [];
+                for (let i = 1; i < state.tapTimes.length; i++) {
+                    diffs.push(state.tapTimes[i] - state.tapTimes[i-1]);
+                }
+                const avgDiff = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+                const newBpm = Math.round(60000 / avgDiff);
+                
+                // Clamp
+                if (newBpm >= 20 && newBpm <= 240) {
+                    state.bpm = newBpm;
+                    bpmSlider.value = newBpm;
+                    bpmDisplay.textContent = newBpm;
+                }
+            }
+        });
+
+        // Initialize
+        initVisualizer();
+        // Set initial selector state
+        beatSelector.children[2].classList.add('bg-sky-500', 'border-sky-500', 'text-white');
+        beatSelector.children[2].classList.remove('bg-slate-800', 'border-slate-700', 'text-slate-400');
+
+        // Handle Spacebar
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                toggleBtn.click();
+            }
+        });
+
+        // Prevent double tap zoom on mobile
+        document.addEventListener('dblclick', function(event) {
+            event.preventDefault();
+        }, { passive: false });
+
+    </script>
+</body>
+</html>
